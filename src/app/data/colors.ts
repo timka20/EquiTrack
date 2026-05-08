@@ -1,0 +1,16 @@
+export const C = {
+  bgPrimary: '#F5F0E8',
+  bgSecondary: '#EDE6D9',
+  textPrimary: '#3D3225',
+  textSecondary: '#7A6B5A',
+  textMuted: '#A89B8C',
+  accentGold: '#C9A962',
+  accentAmber: '#D4A574',
+  accentSienna: '#A67B5B',
+  btnBg: '#C9A962',
+  btnText: '#3D3225',
+  btnHover: '#B8934F',
+  border: '#D9CFC0',
+  heroOverlay: 'rgba(61, 50, 37, 0.55)',
+  white: '#FFFFFF',
+};

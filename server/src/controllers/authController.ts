@@ -228,6 +228,17 @@ export class AuthController {
         return reply.status(404).send({ error: 'Пользователь с таким email не найден' });
       }
 
+      const { sendPasswordReset } = await import('../services/mailService.js');
+      const { success, password, error: mailError } = await sendPasswordReset(email);
+
+      if (!success || !password) {
+        return reply.status(500).send({ error: mailError || 'Ошибка при отправке письма' });
+      }
+
+      const { hashPassword } = await import('../utils/helpers.js');
+      const hashedPassword = await hashPassword(password);
+      await userService.update(user.id, { password: hashedPassword });
+
       return reply.send({ success: true, message: 'Инструкции по восстановлению пароля отправлены на email' });
     } catch (error) {
       console.error('Forgot password error:', error);

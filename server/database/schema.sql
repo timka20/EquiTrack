@@ -16,13 +16,13 @@ CREATE TABLE users (
 CREATE INDEX idx_email ON users(email);
 CREATE INDEX idx_role ON users(role);
 
--- Триггер для автоматического обновления updated_at
+
 CREATE TRIGGER users_updated_at AFTER UPDATE ON users
 BEGIN
   UPDATE users SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
 END;
 
--- Таблица лошадей
+
 CREATE TABLE horses (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
@@ -37,13 +37,13 @@ CREATE TABLE horses (
   father_id INTEGER,
   mother_id INTEGER,
   status TEXT CHECK(status IN ('in_training', 'resting', 'breeding', 'for_sale', 'sold', 'retired')) DEFAULT 'in_training',
-  photos TEXT, -- JSON stored as text
+  photos TEXT, 
   description TEXT,
-  price REAL, -- Цена для продажи
-  total_earnings REAL DEFAULT 0, -- Общий заработок
-  wins INTEGER DEFAULT 0, -- Победы
-  places INTEGER DEFAULT 0, -- Призовые места (1-3)
-  starts INTEGER DEFAULT 0, -- Старты
+  price REAL, 
+  total_earnings REAL DEFAULT 0, 
+  wins INTEGER DEFAULT 0, 
+  places INTEGER DEFAULT 0, 
+  starts INTEGER DEFAULT 0, 
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (breeder_id) REFERENCES users(id) ON DELETE SET NULL,
@@ -63,16 +63,16 @@ BEGIN
   UPDATE horses SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
 END;
 
--- Таблица скачек
+
 CREATE TABLE races (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
   date DATETIME NOT NULL,
   hippodrome TEXT NOT NULL,
-  distance INTEGER NOT NULL, -- Дистанция в метрах
-  surface TEXT DEFAULT 'Дёрн', -- Покрытие
+  distance INTEGER NOT NULL, 
+  surface TEXT DEFAULT 'Дёрн', 
   prize_fund REAL NOT NULL,
-  category TEXT DEFAULT 'Группа III', -- Категория (Группа I, II, III)
+  category TEXT DEFAULT 'Группа III', 
   status TEXT CHECK(status IN ('scheduled', 'registration_open', 'registration_closed', 'in_progress', 'finished', 'cancelled')) DEFAULT 'scheduled',
   description TEXT,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -87,7 +87,7 @@ BEGIN
   UPDATE races SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
 END;
 
--- Таблица регистраций на скачки
+
 CREATE TABLE race_registrations (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   race_id INTEGER NOT NULL,
@@ -107,14 +107,14 @@ CREATE TABLE race_registrations (
 
 CREATE INDEX idx_reg_status ON race_registrations(status);
 
--- Таблица результатов скачек
+
 CREATE TABLE race_results (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   race_id INTEGER NOT NULL,
   horse_id INTEGER NOT NULL,
-  position INTEGER NOT NULL, -- Место (1, 2, 3...)
-  race_time TEXT, -- Время в формате ММ:СС.мс
-  prize REAL, -- Выигрыш
+  position INTEGER NOT NULL, 
+  race_time TEXT, 
+  prize REAL, 
   notes TEXT,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (race_id) REFERENCES races(id) ON DELETE CASCADE,
@@ -124,7 +124,7 @@ CREATE TABLE race_results (
 
 CREATE INDEX idx_position ON race_results(position);
 
--- Таблица случек (разведение)
+
 CREATE TABLE breedings (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   mare_id INTEGER NOT NULL,
@@ -142,7 +142,7 @@ CREATE TABLE breedings (
 CREATE INDEX idx_breeding_status ON breedings(status);
 CREATE INDEX idx_planned_date ON breedings(planned_date);
 
--- Таблица жеребят
+
 CREATE TABLE foals (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   breeding_id INTEGER NOT NULL,
@@ -160,18 +160,18 @@ CREATE TABLE foals (
 
 CREATE INDEX idx_foal_status ON foals(status);
 
--- Таблица медицинских записей
+
 CREATE TABLE medical_records (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   horse_id INTEGER NOT NULL,
   veterinarian_id INTEGER NOT NULL,
   record_date DATE NOT NULL,
-  type TEXT NOT NULL, -- Тип записи (осмотр, лечение, травма и т.д.)
+  type TEXT NOT NULL, 
   description TEXT NOT NULL,
   diagnosis TEXT,
   treatment TEXT,
-  restrictions TEXT, -- Ограничения для тренировок
-  attachments TEXT, -- JSON stored as text (Ссылки на файлы)
+  restrictions TEXT, 
+  attachments TEXT, 
   next_check_date DATE,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (horse_id) REFERENCES horses(id) ON DELETE CASCADE,
@@ -181,7 +181,7 @@ CREATE TABLE medical_records (
 CREATE INDEX idx_med_horse_date ON medical_records(horse_id, record_date);
 CREATE INDEX idx_med_next_check ON medical_records(next_check_date);
 
--- Таблица вакцинаций
+
 CREATE TABLE vaccinations (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   horse_id INTEGER NOT NULL,
@@ -198,16 +198,16 @@ CREATE TABLE vaccinations (
 CREATE INDEX idx_vac_horse ON vaccinations(horse_id);
 CREATE INDEX idx_vac_next_date ON vaccinations(next_date);
 
--- Таблица тренировок
+
 CREATE TABLE trainings (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   horse_id INTEGER NOT NULL,
   trainer_id INTEGER NOT NULL,
   training_date DATE NOT NULL,
-  type TEXT NOT NULL, -- Вид нагрузки
-  duration INTEGER NOT NULL, -- Длительность в минутах
+  type TEXT NOT NULL, 
+  duration INTEGER NOT NULL, 
   intensity TEXT CHECK(intensity IN ('low', 'medium', 'high')) NOT NULL,
-  horse_condition TEXT NOT NULL, -- Самочувствие лошади
+  horse_condition TEXT NOT NULL, 
   notes TEXT,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (horse_id) REFERENCES horses(id) ON DELETE CASCADE,
@@ -216,18 +216,18 @@ CREATE TABLE trainings (
 
 CREATE INDEX idx_train_horse_date ON trainings(horse_id, training_date);
 
--- Таблица отчетов жокеев
+
 CREATE TABLE jockey_reports (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   race_id INTEGER NOT NULL,
   horse_id INTEGER NOT NULL,
   jockey_id INTEGER NOT NULL,
-  start_behavior TEXT NOT NULL, -- Поведение на старте
-  distance_behavior TEXT NOT NULL, -- Поведение на дистанции
-  finish_behavior TEXT NOT NULL, -- Поведение на финише
-  finish_condition TEXT NOT NULL, -- Самочувствие после заезда
-  equipment_notes TEXT, -- Замечания по снаряжению
-  recommendations TEXT, -- Рекомендации тренеру
+  start_behavior TEXT NOT NULL, 
+  distance_behavior TEXT NOT NULL, 
+  finish_behavior TEXT NOT NULL, 
+  finish_condition TEXT NOT NULL, 
+  equipment_notes TEXT, 
+  recommendations TEXT, 
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (race_id) REFERENCES races(id) ON DELETE CASCADE,
   FOREIGN KEY (horse_id) REFERENCES horses(id) ON DELETE CASCADE,
@@ -235,7 +235,7 @@ CREATE TABLE jockey_reports (
   UNIQUE(race_id, horse_id)
 );
 
--- Таблица сообщений
+
 CREATE TABLE messages (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   sender_id INTEGER NOT NULL,
@@ -251,7 +251,7 @@ CREATE TABLE messages (
 CREATE INDEX idx_receiver ON messages(receiver_id);
 CREATE INDEX idx_sender ON messages(sender_id);
 
--- Таблица уведомлений
+
 CREATE TABLE notifications (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL,
@@ -266,12 +266,12 @@ CREATE TABLE notifications (
 CREATE INDEX idx_user_read ON notifications(user_id, is_read);
 CREATE INDEX idx_notif_created ON notifications(created_at);
 
--- Таблица логов активности
+
 CREATE TABLE activity_logs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER,
   action TEXT NOT NULL,
-  entity_type TEXT NOT NULL, -- Тип сущности (horse, race, user и т.д.)
+  entity_type TEXT NOT NULL, 
   entity_id INTEGER,
   details TEXT,
   ip_address TEXT,
@@ -283,7 +283,7 @@ CREATE INDEX idx_log_user ON activity_logs(user_id);
 CREATE INDEX idx_log_entity ON activity_logs(entity_type, entity_id);
 CREATE INDEX idx_log_created ON activity_logs(created_at);
 
--- Таблица отношений тренер-лошадь (дополнительная для многие-ко-многим)
+
 CREATE TABLE trainer_horses (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   trainer_id INTEGER NOT NULL,
@@ -294,7 +294,7 @@ CREATE TABLE trainer_horses (
   UNIQUE(trainer_id, horse_id)
 );
 
--- Таблица жокей-лошадь назначения
+
 CREATE TABLE jockey_assignments (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   jockey_id INTEGER NOT NULL,
@@ -308,7 +308,7 @@ CREATE TABLE jockey_assignments (
   UNIQUE(jockey_id, horse_id, is_active)
 );
 
--- Таблица ветеринарных назначений
+
 CREATE TABLE veterinarian_assignments (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   veterinarian_id INTEGER NOT NULL,

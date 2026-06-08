@@ -8,7 +8,8 @@ export const authenticate = fp(async (fastify: FastifyInstance) => {
       const token = request.headers.authorization?.replace('Bearer ', '');
 
       if (!token) {
-        return reply.status(401).send({ error: 'Authentication required' });
+        reply.status(401).send({ error: 'Authentication required' });
+        throw new Error('Authentication required');
       }
 
       const decoded = fastify.jwt.verify(token) as {
@@ -19,8 +20,10 @@ export const authenticate = fp(async (fastify: FastifyInstance) => {
         lastName: string;
       };
       request.user = decoded;
-    } catch (err) {
-      return reply.status(401).send({ error: 'Invalid token' });
+    } catch (err: any) {
+      if (err?.message === 'Authentication required') throw err;
+      reply.status(401).send({ error: 'Invalid token' });
+      throw new Error('Invalid token');
     }
   });
 });

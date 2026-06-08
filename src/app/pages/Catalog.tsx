@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router';
-import { Search, Filter, Heart, Star, ChevronDown } from 'lucide-react';
+import { Search, Filter, Heart, Star, ChevronDown, Plus } from 'lucide-react';
 import { C } from '../data/colors';
 import { horsesApi } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -42,6 +42,16 @@ const sortOptions = [
   { value: 'wins', label: 'По количеству побед' },
 ];
 
+const statusOptions = [
+  { value: 'all', label: 'Все статусы' },
+  { value: 'for_sale', label: 'В продаже' },
+  { value: 'in_training', label: 'В тренировке' },
+  { value: 'resting', label: 'Отдых' },
+  { value: 'breeding', label: 'В разведении' },
+  { value: 'sold', label: 'Продан' },
+  { value: 'retired', label: 'Выбыл' },
+];
+
 function formatMoney(amount: number) {
   return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 }).format(amount);
 }
@@ -57,8 +67,10 @@ export default function Catalog() {
   const [sortBy, setSortBy] = useState('newest');
   const [favorites, setFavorites] = useState<Set<number>>(new Set());
   const [showFilters, setShowFilters] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [allHorses, setAllHorses] = useState<any[]>([]);
 
-  const isOwner = user?.role === 'owner_private' || user?.role === 'owner_stud';
+  const canAddHorse = user?.role === 'owner_private' || user?.role === 'owner_stud' || user?.role === 'admin';
 
   useEffect(() => {
     const saved = localStorage.getItem('favorites');
@@ -75,8 +87,7 @@ export default function Catalog() {
     const fetchHorses = async () => {
       try {
         setLoading(true);
-
-        const data = isOwner && user?.id ? await horsesApi.getAll({ ownerId: user.id }) : await horsesApi.getAll();
+        const data = await horsesApi.getAll();
         setHorses(data);
       } catch (error) {
         console.error('Error fetching horses:', error);
@@ -85,7 +96,21 @@ export default function Catalog() {
       }
     };
     fetchHorses();
-  }, [isOwner, user?.id]);
+  }, []);
+
+  useEffect(() => {
+    const fetchAllHorses = async () => {
+      try {
+        const data = await horsesApi.getAll();
+        setAllHorses(data);
+      } catch (error) {
+        console.error('Error fetching all horses:', error);
+      }
+    };
+    if (showAddModal) {
+      fetchAllHorses();
+    }
+  }, [showAddModal]);
 
   const filteredHorses = useMemo(() => {
     let result = [...horses];
@@ -149,9 +174,39 @@ export default function Catalog() {
       for_sale: { bg: 'rgba(34,197,94,0.12)', color: '#16a34a', label: 'В продаже' },
       in_training: { bg: 'rgba(59,130,246,0.12)', color: '#3b82f6', label: 'В тренировке' },
       resting: { bg: 'rgba(245,158,11,0.12)', color: '#f59e0b', label: 'Отдых' },
+      breeding: { bg: 'rgba(168,85,247,0.12)', color: '#a855f7', label: 'В разведении' },
       sold: { bg: 'rgba(100,100,100,0.12)', color: '#666', label: 'Продан' },
+      retired: { bg: 'rgba(100,100,100,0.12)', color: '#666', label: 'Выбыл' },
     };
     return configs[status] || { bg: 'rgba(200,200,200,0.2)', color: '#999', label: status };
+  };
+
+  const handleAddHorse = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const photosRaw = formData.get('photos') as string;
+    const photos = photosRaw ? photosRaw.split(',').map(p => p.trim()).filter(Boolean) : [];
+
+    try {
+      await horsesApi.create({
+        name: formData.get('name') as string,
+        gender: formData.get('gender') as string,
+        color: formData.get('color') as string,
+        birthYear: parseInt(formData.get('birthYear') as string),
+        birthCountry: formData.get('birthCountry') as string,
+        fatherId: formData.get('fatherId') ? parseInt(formData.get('fatherId') as string) : undefined,
+        motherId: formData.get('motherId') ? parseInt(formData.get('motherId') as string) : undefined,
+        status: formData.get('status') as string,
+        photos,
+        description: formData.get('description') as string,
+        price: formData.get('price') ? parseFloat(formData.get('price') as string) : undefined,
+      });
+      setShowAddModal(false);
+      const data = await horsesApi.getAll();
+      setHorses(data);
+    } catch (error: any) {
+      alert('Ошибка при добавлении лошади: ' + (error.message || 'Неизвестная ошибка'));
+    }
   };
 
   return (
@@ -238,6 +293,27 @@ export default function Catalog() {
             <span style={{ color: C.textMuted, fontSize: '0.875rem' }}>
               Найдено: <strong style={{ color: C.textPrimary }}>{filteredHorses.length}</strong>
             </span>
+            {canAddHorse && (
+              <button
+                onClick={() => setShowAddModal(true)}
+                style={{
+                  marginLeft: 'auto',
+                  background: C.accentGold,
+                  color: C.textPrimary,
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '0.5rem 1rem',
+                  fontSize: '0.875rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                }}
+              >
+                <Plus size={16} /> Добавить лошадь
+              </button>
+            )}
           </div>
         </div>
 
@@ -263,7 +339,20 @@ export default function Catalog() {
 
                   <div style={{ height: '200px', overflow: 'hidden', position: 'relative' }}>
                     <img
-                      src={horse.photos || 'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?w=800'}
+                      src={(() => {
+                        try {
+                          if (typeof horse.photos === 'string') {
+                            const parsed = JSON.parse(horse.photos);
+                            return parsed[0] || 'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?w=800';
+                          }
+                          if (Array.isArray(horse.photos)) {
+                            return horse.photos[0] || 'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?w=800';
+                          }
+                          return 'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?w=800';
+                        } catch {
+                          return 'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?w=800';
+                        }
+                      })()}
                       alt={horse.name}
                       style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.4s' }}
                       onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1.07)'; }}
@@ -323,7 +412,7 @@ export default function Catalog() {
                       <div>
                         <p style={{ color: C.textMuted, fontSize: '0.72rem' }}>Цена</p>
                         <p style={{ fontFamily: "'Unbounded', sans-serif", color: horse.price ? C.accentGold : C.textMuted, fontSize: '1.1rem', fontWeight: 700 }}>
-                          {horse.price ? formatMoney(horse.price) : 'По запросу'}
+                          {horse.price != null ? formatMoney(horse.price) : 'По запросу'}
                         </p>
                       </div>
                       <Link
@@ -366,6 +455,111 @@ export default function Catalog() {
           </div>
         )}
       </div>
+
+      {showAddModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 1000, padding: '1rem'
+        }} onClick={() => setShowAddModal(false)}>
+          <div style={{ background: C.white, borderRadius: '12px', padding: '1.5rem', width: '100%', maxWidth: '600px', maxHeight: '90vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ fontFamily: "'Unbounded', sans-serif", color: C.textPrimary, fontSize: '1.1rem', fontWeight: 700, marginBottom: '1.25rem' }}>
+              Добавить новую лошадь
+            </h3>
+            <form onSubmit={handleAddHorse} className="space-y-4">
+              <div>
+                <label style={{ color: C.textSecondary, fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>Имя лошади *</label>
+                <input type="text" name="name" required placeholder="Например: Звёздный Султан" style={{ width: '100%', background: C.bgSecondary, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '0.6rem', fontSize: '0.82rem', color: C.textPrimary }} />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ color: C.textSecondary, fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>Пол *</label>
+                  <select name="gender" required style={{ width: '100%', background: C.bgSecondary, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '0.6rem', fontSize: '0.82rem', color: C.textPrimary }}>
+                    <option value="">Выберите</option>
+                    <option value="stallion">Жеребец</option>
+                    <option value="mare">Кобыла</option>
+                    <option value="gelding">Мерин</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ color: C.textSecondary, fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>Масть *</label>
+                  <input type="text" name="color" required placeholder="Например: Гнедой" style={{ width: '100%', background: C.bgSecondary, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '0.6rem', fontSize: '0.82rem', color: C.textPrimary }} />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ color: C.textSecondary, fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>Год рождения *</label>
+                  <input type="number" name="birthYear" required min="1990" max={new Date().getFullYear()} style={{ width: '100%', background: C.bgSecondary, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '0.6rem', fontSize: '0.82rem', color: C.textPrimary }} />
+                </div>
+                <div>
+                  <label style={{ color: C.textSecondary, fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>Страна рождения *</label>
+                  <input type="text" name="birthCountry" required placeholder="Например: Россия" style={{ width: '100%', background: C.bgSecondary, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '0.6rem', fontSize: '0.82rem', color: C.textPrimary }} />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ color: C.textSecondary, fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>Отец</label>
+                  <select name="fatherId" style={{ width: '100%', background: C.bgSecondary, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '0.6rem', fontSize: '0.82rem', color: C.textPrimary }}>
+                    <option value="">Не указан</option>
+                    {allHorses.filter((h: any) => h.gender === 'stallion').map((h: any) => (
+                      <option key={h.id} value={h.id}>{h.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ color: C.textSecondary, fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>Мать</label>
+                  <select name="motherId" style={{ width: '100%', background: C.bgSecondary, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '0.6rem', fontSize: '0.82rem', color: C.textPrimary }}>
+                    <option value="">Не указана</option>
+                    {allHorses.filter((h: any) => h.gender === 'mare').map((h: any) => (
+                      <option key={h.id} value={h.id}>{h.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ color: C.textSecondary, fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>Статус</label>
+                  <select name="status" required style={{ width: '100%', background: C.bgSecondary, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '0.6rem', fontSize: '0.82rem', color: C.textPrimary }}>
+                    <option value="in_training">В тренировке</option>
+                    <option value="resting">Отдых</option>
+                    <option value="breeding">В разведении</option>
+                    <option value="for_sale">В продаже</option>
+                    <option value="sold">Продан</option>
+                    <option value="retired">Выбыл</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ color: C.textSecondary, fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>Цена (₽)</label>
+                  <input type="number" name="price" min="0" placeholder="По запросу" style={{ width: '100%', background: C.bgSecondary, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '0.6rem', fontSize: '0.82rem', color: C.textPrimary }} />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ color: C.textSecondary, fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>Фото (URL через запятую)</label>
+                <input type="text" name="photos" placeholder="https://example.com/photo1.jpg, https://example.com/photo2.jpg" style={{ width: '100%', background: C.bgSecondary, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '0.6rem', fontSize: '0.82rem', color: C.textPrimary }} />
+              </div>
+
+              <div>
+                <label style={{ color: C.textSecondary, fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>Описание</label>
+                <textarea name="description" rows={3} placeholder="Описание лошади, достижения, особенности..." style={{ width: '100%', background: C.bgSecondary, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '0.6rem', fontSize: '0.82rem', color: C.textPrimary, resize: 'none' }} />
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem' }}>
+                <button type="submit" style={{ flex: 1, background: C.accentGold, color: C.textPrimary, border: 'none', borderRadius: '8px', padding: '0.75rem', fontSize: '0.875rem', fontWeight: 700, cursor: 'pointer' }}>
+                  Добавить
+                </button>
+                <button type="button" onClick={() => setShowAddModal(false)} style={{ flex: 1, background: C.bgSecondary, color: C.textSecondary, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '0.75rem', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer' }}>
+                  Отмена
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

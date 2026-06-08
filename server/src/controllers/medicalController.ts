@@ -1,6 +1,19 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { medicalService } from '../services/medicalService.js';
 
+function isFutureDate(dateStr: string): boolean {
+  const date = new Date(dateStr);
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  return date >= now;
+}
+
+function isDateAfter(dateStr: string, afterStr: string): boolean {
+  const date = new Date(dateStr);
+  const after = new Date(afterStr);
+  return date > after;
+}
+
 export class MedicalController {
   async getMedicalRecords(request: FastifyRequest, reply: FastifyReply) {
     try {
@@ -9,7 +22,7 @@ export class MedicalController {
       return reply.send(records);
     } catch (error) {
       console.error('Get medical records error:', error);
-      return reply.status(500).send({ error: 'Internal server error' });
+      return reply.status(500).send({ error: 'Ошибка при получении медицинских записей' });
     }
   }
 
@@ -27,11 +40,15 @@ export class MedicalController {
       };
 
       if (!date || !description) {
-        return reply.status(400).send({ error: 'Missing required fields: date, description' });
+        return reply.status(400).send({ error: 'Укажите дату и описание' });
+      }
+
+      if (!isFutureDate(date)) {
+        return reply.status(400).send({ error: 'Дата не может быть в прошлом' });
       }
 
       if (!request.user) {
-        return reply.status(401).send({ error: 'Not authenticated' });
+        return reply.status(401).send({ error: 'Не авторизован' });
       }
 
       const record = await medicalService.createMedicalRecord({
@@ -49,7 +66,7 @@ export class MedicalController {
       return reply.status(201).send(record);
     } catch (error) {
       console.error('Create medical record error:', error);
-      return reply.status(500).send({ error: 'Internal server error' });
+      return reply.status(500).send({ error: 'Ошибка при создании медицинской записи' });
     }
   }
 
@@ -69,13 +86,13 @@ export class MedicalController {
       });
 
       if (!updated) {
-        return reply.status(404).send({ error: 'Medical record not found' });
+        return reply.status(404).send({ error: 'Запись не найдена' });
       }
 
       return reply.send({ success: true });
     } catch (error) {
       console.error('Update medical record error:', error);
-      return reply.status(500).send({ error: 'Internal server error' });
+      return reply.status(500).send({ error: 'Ошибка при обновлении записи' });
     }
   }
 
@@ -85,13 +102,13 @@ export class MedicalController {
       const deleted = await medicalService.deleteMedicalRecord(parseInt(id));
 
       if (!deleted) {
-        return reply.status(404).send({ error: 'Medical record not found' });
+        return reply.status(404).send({ error: 'Запись не найдена' });
       }
 
       return reply.send({ success: true });
     } catch (error) {
       console.error('Delete medical record error:', error);
-      return reply.status(500).send({ error: 'Internal server error' });
+      return reply.status(500).send({ error: 'Ошибка при удалении записи' });
     }
   }
 
@@ -102,7 +119,7 @@ export class MedicalController {
       return reply.send(vaccinations);
     } catch (error) {
       console.error('Get vaccinations error:', error);
-      return reply.status(500).send({ error: 'Internal server error' });
+      return reply.status(500).send({ error: 'Ошибка при получении прививок' });
     }
   }
 
@@ -117,7 +134,19 @@ export class MedicalController {
       };
 
       if (!request.user) {
-        return reply.status(401).send({ error: 'Not authenticated' });
+        return reply.status(401).send({ error: 'Не авторизован' });
+      }
+
+      if (!name || !date) {
+        return reply.status(400).send({ error: 'Укажите название и дату прививки' });
+      }
+
+      if (!isFutureDate(date)) {
+        return reply.status(400).send({ error: 'Дата прививки не может быть в прошлом' });
+      }
+
+      if (nextDate && !isDateAfter(nextDate, date)) {
+        return reply.status(400).send({ error: 'Следующая дата должна быть позже даты прививки' });
       }
 
       const vaccination = await medicalService.createVaccination({
@@ -132,7 +161,7 @@ export class MedicalController {
       return reply.status(201).send(vaccination);
     } catch (error) {
       console.error('Create vaccination error:', error);
-      return reply.status(500).send({ error: 'Internal server error', e: error });
+      return reply.status(500).send({ error: 'Ошибка при создании прививки' });
     }
   }
 
@@ -143,7 +172,7 @@ export class MedicalController {
       return reply.send(vaccinations);
     } catch (error) {
       console.error('Get upcoming vaccinations error:', error);
-      return reply.status(500).send({ error: 'Internal server error' });
+      return reply.status(500).send({ error: 'Ошибка при получении прививок' });
     }
   }
 
@@ -154,7 +183,7 @@ export class MedicalController {
       return reply.send({ restrictions });
     } catch (error) {
       console.error('Get restrictions error:', error);
-      return reply.status(500).send({ error: 'Internal server error' });
+      return reply.status(500).send({ error: 'Ошибка при получении ограничений' });
     }
   }
 
@@ -165,7 +194,7 @@ export class MedicalController {
       return reply.send(stats);
     } catch (error) {
       console.error('Get medical stats error:', error);
-      return reply.status(500).send({ error: 'Internal server error' });
+      return reply.status(500).send({ error: 'Ошибка при получении статистики' });
     }
   }
 }

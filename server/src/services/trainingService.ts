@@ -45,7 +45,7 @@ export class TrainingService {
     ).run(
       training.horseId,
       training.trainerId,
-      training.date,
+      training.date instanceof Date ? training.date.toISOString().split('T')[0] : training.date,
       training.type,
       training.duration,
       training.intensity,

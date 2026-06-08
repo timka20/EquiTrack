@@ -55,12 +55,12 @@ export class RaceService {
       try {
         participantsRows = db.prepare(`
           SELECT rr.*, h.name as horse_name, h.color as horse_color,
-            u1.first_name as owner_first_name, u1.last_name as owner_last_name,
+            ho.first_name as owner_first_name, ho.last_name as owner_last_name,
             u2.first_name as trainer_first_name, u2.last_name as trainer_last_name,
             u3.first_name as jockey_first_name, u3.last_name as jockey_last_name
           FROM race_registrations rr
           JOIN horses h ON rr.horse_id = h.id
-          LEFT JOIN users u1 ON rr.owner_id = u1.id
+          LEFT JOIN users ho ON h.owner_id = ho.id
           LEFT JOIN users u2 ON rr.trainer_id = u2.id
           LEFT JOIN users u3 ON rr.jockey_id = u3.id
           WHERE rr.race_id = ?

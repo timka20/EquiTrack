@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { C } from '../data/colors';
 import { useAuth } from '../contexts/AuthContext';
-import { horsesApi, racesApi, trainingsApi, medicalApi, adminApi, notificationsApi, breedingsApi } from '../services/api';
+import { horsesApi, racesApi, trainingsApi, medicalApi, adminApi, notificationsApi, breedingsApi, jockeyReportsApi } from '../services/api';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 
 type Role = 'owner' | 'farm' | 'trainer' | 'jockey' | 'vet' | 'admin' | 'user' | 'guest';
@@ -22,6 +22,8 @@ const roles: { key: Role; label: string; icon: any; desc: string }[] = [
   { key: 'jockey', label: 'Жокей', icon: UserCheck, desc: 'Отчёты по заездам' },
   { key: 'vet', label: 'Ветеринар', icon: Stethoscope, desc: 'Медицинские карты' },
   { key: 'admin', label: 'Администратор', icon: Shield, desc: 'Управление платформой' },
+  { key: 'user', label: 'Пользователь', icon: User, desc: 'Гостевой доступ' },
+  { key: 'guest', label: 'Гость', icon: User, desc: 'Гостевой доступ' },
 ];
 
 function formatMoney(amount: number | string | undefined | null): string {
@@ -35,6 +37,75 @@ function getUserName(user: any): { firstName: string; lastName: string } {
   const firstName = user?.firstName || user?.first_name || '';
   const lastName = user?.lastName || user?.last_name || '';
   return { firstName, lastName };
+}
+
+function translateMedicalType(type: string): string {
+  const map: Record<string, string> = {
+    routine: 'Плановый осмотр',
+    checkup: 'Осмотр',
+    treatment: 'Лечение',
+    injury: 'Травма',
+    trauma: 'Травма',
+    vaccination: 'Вакцинация',
+    surgery: 'Операция',
+    examination: 'Обследование',
+    'Плановый осмотр': 'Плановый осмотр',
+    'Лечение': 'Лечение',
+    'Травма': 'Травма',
+    'Вакцинация': 'Вакцинация',
+  };
+  return map[type?.trim()] || type || 'Запись';
+}
+
+function translateTrainingType(type: string): string {
+  const map: Record<string, string> = {
+    cardio: 'Кардио',
+    gallop: 'Галоп',
+    trot: 'Рысь',
+    sprint: 'Спринт',
+    dressage: 'Выездка',
+    'regular training': 'Обычная тренировка',
+    canter: 'Кантер',
+    jumping: 'Прыжки',
+    endurance: 'Выносливость',
+    work: 'Работа',
+    'Галоп': 'Галоп',
+    'Рысь': 'Рысь',
+    'Спринт': 'Спринт',
+    'Выездка': 'Выездка',
+  };
+  return map[type?.toLowerCase()?.trim()] || type || 'Тренировка';
+}
+
+function translateTrainingNote(note: string): string {
+  const map: Record<string, string> = {
+    'Regular training': 'Обычная тренировка',
+    'regular training': 'Обычная тренировка',
+  };
+  return map[note?.trim()] || note || '';
+}
+
+function translateMedicalDescription(desc: string): string {
+  const map: Record<string, string> = {
+    'Regular checkup': 'Регулярный осмотр',
+    'General examination': 'Общий осмотр',
+    'Annual vaccination': 'Ежегодная вакцинация',
+    'Vaccination': 'Вакцинация',
+    'Minor tendon strain': 'Небольшое растяжение сухожилия',
+    'Routine check': 'Плановый осмотр',
+  };
+  return map[desc?.trim()] || desc || '';
+}
+
+function getPhoto(h: any): string {
+  try {
+    if (typeof h.photos === 'string') {
+      const parsed = JSON.parse(h.photos);
+      return parsed[0] || 'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?w=800';
+    }
+    if (Array.isArray(h.photos)) return h.photos[0] || 'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?w=800';
+  } catch { }
+  return 'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?w=800';
 }
 
 function UserDashboard() {
@@ -154,7 +225,7 @@ function UserDashboard() {
           <div className="space-y-3">
             {favoriteHorses.slice(0, 5).map(h => (
               <Link key={h.id} to={`/horse/${h.id}`} style={{ display: 'flex', gap: '1rem', alignItems: 'center', padding: '0.875rem 1rem', background: C.bgSecondary, borderRadius: '8px', textDecoration: 'none' }}>
-                <img src={h.photos ? JSON.parse(h.photos)[0] : ''} alt={h.name} style={{ width: '40px', height: '40px', borderRadius: '6px', objectFit: 'cover' }} />
+                <img src={getPhoto(h)} alt={h.name} style={{ width: '40px', height: '40px', borderRadius: '6px', objectFit: 'cover' }} />
                 <div className="flex-1">
                   <p style={{ color: C.textPrimary, fontWeight: 700, fontSize: '0.9rem' }}>{h.name}</p>
                   <p style={{ color: C.textMuted, fontSize: '0.78rem' }}>{h.birthYear} г.р. · {h.gender === 'stallion' ? 'Жеребец' : h.gender === 'mare' ? 'Кобыла' : 'Мерин'}</p>
@@ -251,7 +322,7 @@ function OwnerDashboard({ userId }: { userId: number }) {
             {myHorses.map(h => (
               <Link to={`/horse/${h.id}`} key={h.id}
                 style={{ display: 'flex', gap: '0.875rem', alignItems: 'center', textDecoration: 'none', padding: '0.5rem', borderRadius: '8px', background: C.bgSecondary }}>
-                <img src={h.photos?.[0] || 'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?w=800'} alt={h.name} style={{ width: '44px', height: '44px', borderRadius: '8px', objectFit: 'cover', flexShrink: 0 }} />
+                <img src={getPhoto(h)} alt={h.name} style={{ width: '44px', height: '44px', borderRadius: '8px', objectFit: 'cover', flexShrink: 0 }} />
                 <div className="flex-1 min-w-0">
                   <p style={{ color: C.textPrimary, fontWeight: 700, fontSize: '0.875rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{h.name}</p>
                   <p style={{ color: C.textMuted, fontSize: '0.75rem' }}>{h.wins || 0} побед · {formatMoney(h.totalEarnings || 0)}</p>
@@ -350,13 +421,18 @@ function TrainerDashboard() {
   const handleAddTraining = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
+    const duration = parseInt(formData.get('duration') as string);
+    if (isNaN(duration) || duration < 1 || duration > 300) {
+      alert('Длительность тренировки должна быть от 1 до 300 минут');
+      return;
+    }
     try {
       await trainingsApi.create({
         horseId: parseInt(formData.get('horseId') as string),
         type: formData.get('type') as string,
-        duration: parseInt(formData.get('duration') as string),
+        duration,
         intensity: formData.get('intensity') as string,
-        horseCondition: formData.get('horseCondition') as string,
+        condition: formData.get('horseCondition') as string,
         notes: formData.get('notes') as string,
         date: new Date().toISOString()
       });
@@ -364,8 +440,8 @@ function TrainerDashboard() {
 
       const data = await trainingsApi.getAll();
       setTrainings(data.slice(0, 10));
-    } catch (error) {
-      alert('Ошибка при добавлении тренировки');
+    } catch (error: any) {
+      alert('Ошибка при добавлении тренировки: ' + (error.message || 'Неизвестная ошибка'));
     }
   };
 
@@ -423,11 +499,11 @@ function TrainerDashboard() {
                   </span>
                 </div>
                 <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                  <span style={{ color: C.textSecondary, fontSize: '0.78rem' }}>{log.type}</span>
+                  <span style={{ color: C.textSecondary, fontSize: '0.78rem' }}>{translateTrainingType(log.type)}</span>
                   <span style={{ color: C.textSecondary, fontSize: '0.78rem' }}>{log.duration} мин</span>
                   <span style={{ color: C.textMuted, fontSize: '0.78rem' }}>{new Date(log.training_date || log.date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</span>
                 </div>
-                {log.notes && <p style={{ color: C.textMuted, fontSize: '0.78rem', marginTop: '0.35rem' }}>{log.notes}</p>}
+                {log.notes && <p style={{ color: C.textMuted, fontSize: '0.78rem', marginTop: '0.35rem' }}>{translateTrainingNote(log.notes)}</p>}
               </div>
             )) : (
               <p style={{ color: C.textMuted, textAlign: 'center', padding: '1rem' }}>Нет записей о тренировках</p>
@@ -489,7 +565,7 @@ function TrainerDashboard() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                 <div>
                   <label style={{ color: C.textSecondary, fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>Длительность (мин)</label>
-                  <input type="number" name="duration" required min="1" style={{ width: '100%', background: C.bgSecondary, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '0.6rem', fontSize: '0.82rem', color: C.textPrimary }} />
+                  <input type="number" name="duration" required min="1" max="300" style={{ width: '100%', background: C.bgSecondary, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '0.6rem', fontSize: '0.82rem', color: C.textPrimary }} />
                 </div>
                 <div>
                   <label style={{ color: C.textSecondary, fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>Интенсивность</label>
@@ -569,28 +645,47 @@ function VetDashboard() {
   const handleAddVaccination = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
+    const date = formData.get('date') as string;
+    const nextDate = formData.get('nextDate') as string;
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    if (new Date(date) < today) {
+      alert('Дата прививки не может быть в прошлом');
+      return;
+    }
+    if (nextDate && new Date(nextDate) <= new Date(date)) {
+      alert('Следующая дата должна быть позже даты прививки');
+      return;
+    }
     try {
       await medicalApi.createVaccination(parseInt(selectedHorseId), {
         name: formData.get('name') as string,
-        date: formData.get('date') as string,
-        nextDate: formData.get('nextDate') as string,
+        date,
+        nextDate,
         notes: formData.get('notes') as string
       });
       setShowVaccineModal(false);
 
       const data = await medicalApi.getUpcomingVaccinations();
       setVaccinations(data.slice(0, 10));
-    } catch (error) {
-      alert('Ошибка при добавлении прививки');
+    } catch (error: any) {
+      alert('Ошибка при добавлении прививки: ' + (error.message || 'Неизвестная ошибка'));
     }
   };
 
   const handleAddMedicalRecord = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
+    const date = formData.get('date') as string;
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    if (new Date(date) < today) {
+      alert('Дата записи не может быть в прошлом');
+      return;
+    }
     try {
       await medicalApi.createRecord(parseInt(selectedHorseId), {
-        date: formData.get('date') as string,
+        date,
         type: formData.get('type') as string,
         description: formData.get('description') as string,
         diagnosis: formData.get('diagnosis') as string,
@@ -608,8 +703,8 @@ function VetDashboard() {
         } catch (e) {}
       }
       setMedicalRecords(records.slice(0, 10));
-    } catch (error) {
-      alert('Ошибка при добавлении медицинской записи');
+    } catch (error: any) {
+      alert('Ошибка при добавлении медицинской записи: ' + (error.message || 'Неизвестная ошибка'));
     }
   };
 
@@ -704,7 +799,7 @@ function VetDashboard() {
                   <span style={{ color: C.textPrimary, fontWeight: 700, fontSize: '0.875rem' }}>{r.horse_name || 'Лошадь'}</span>
                   <span style={{ color: C.textMuted, fontSize: '0.75rem' }}>{new Date(r.record_date || r.date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</span>
                 </div>
-                <p style={{ color: C.textSecondary, fontSize: '0.82rem', marginBottom: '0.35rem' }}>{r.type}: {r.description}</p>
+                <p style={{ color: C.textSecondary, fontSize: '0.82rem', marginBottom: '0.35rem' }}>{translateMedicalType(r.type)}: {translateMedicalDescription(r.description)}</p>
                 {r.restrictions && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                     <AlertCircle size={12} style={{ color: C.accentAmber }} />
@@ -838,6 +933,7 @@ function VetDashboard() {
 function JockeyDashboard() {
   const [submitted, setSubmitted] = useState(false);
   const [upcomingRaces, setUpcomingRaces] = useState<any[]>([]);
+  const [finishedRaces, setFinishedRaces] = useState<any[]>([]);
   const [horses, setHorses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedRace, setSelectedRace] = useState<any>(null);
@@ -863,10 +959,15 @@ function JockeyDashboard() {
           .filter((r: any) => r.status !== 'finished' && new Date(r.date) >= new Date())
           .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime())
           .slice(0, 5);
+        const finished = racesData
+          .filter((r: any) => r.status === 'finished' || new Date(r.date) < new Date())
+          .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
+          .slice(0, 20);
         setUpcomingRaces(upcoming);
+        setFinishedRaces(finished);
         setHorses(horsesData);
-        if (upcoming.length > 0) {
-          setSelectedRace(upcoming[0]);
+        if (finished.length > 0) {
+          setSelectedRace(finished[0]);
         }
       } catch (error) {
         console.error('Error fetching jockey data:', error);
@@ -882,16 +983,24 @@ function JockeyDashboard() {
       alert('Выберите лошадь');
       return;
     }
+    if (!selectedRace) {
+      alert('Выберите скачку');
+      return;
+    }
     try {
-      await trainingsApi.create({
-        raceId: selectedRace?.id,
+      await jockeyReportsApi.create({
+        raceId: selectedRace.id,
         horseId: parseInt(selectedHorse),
-        isJockeyReport: true,
-        ...reportForm
+        startBehavior: reportForm.startBehavior,
+        distanceBehavior: reportForm.distanceBehavior,
+        finishBehavior: reportForm.finishBehavior,
+        condition: reportForm.finishCondition,
+        equipmentNotes: reportForm.equipmentNotes,
+        recommendations: reportForm.recommendations,
       });
       setSubmitted(true);
-    } catch (error) {
-      alert('Ошибка при отправке отчета');
+    } catch (error: any) {
+      alert('Ошибка при отправке отчета: ' + (error.message || 'Неизвестная ошибка'));
     }
   };
 
@@ -986,11 +1095,13 @@ function JockeyDashboard() {
                 <label style={{ color: C.textSecondary, fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>Скачка</label>
                 <select 
                   value={selectedRace?.id || ''} 
-                  onChange={(e) => setSelectedRace(upcomingRaces.find(r => r.id === parseInt(e.target.value)) || null)}
-                  style={{ width: '100%', background: C.bgSecondary, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '0.6rem', fontSize: '0.82rem', color: C.textPrimary }}
+                  onChange={(e) => setSelectedRace(finishedRaces.find(r => r.id === parseInt(e.target.value)) || null)}
+                  disabled={finishedRaces.length === 0}
+                  style={{ width: '100%', background: C.bgSecondary, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '0.6rem', fontSize: '0.82rem', color: C.textPrimary, opacity: finishedRaces.length === 0 ? 0.6 : 1 }}
                 >
-                  {upcomingRaces.map(race => (
-                    <option key={race.id} value={race.id}>{race.name}</option>
+                  {finishedRaces.length === 0 && <option value="">Нет завершённых заездов</option>}
+                  {finishedRaces.map(race => (
+                    <option key={race.id} value={race.id}>{race.name} — {new Date(race.date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' })}</option>
                   ))}
                 </select>
               </div>
@@ -2086,14 +2197,21 @@ function AdminDashboard() {
 }
 
 function FarmDashboard() {
+  const { user } = useAuth();
   const [horses, setHorses] = useState<any[]>([]);
+  const [allHorses, setAllHorses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showAddModal, setShowAddModal] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const data = await horsesApi.getAll();
-        setHorses(data);
+        const [myHorses, all] = await Promise.all([
+          horsesApi.getAll({ ownerId: user?.id }),
+          horsesApi.getAll()
+        ]);
+        setHorses(myHorses);
+        setAllHorses(all);
       } catch (error) {
         console.error('Error fetching horses:', error);
       } finally {
@@ -2101,9 +2219,41 @@ function FarmDashboard() {
       }
     };
     fetchData();
-  }, []);
+  }, [user?.id]);
+
+  const handleAddHorse = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const birthYear = parseInt(formData.get('birthYear') as string);
+    const currentYear = new Date().getFullYear();
+    if (birthYear > currentYear) {
+      alert('Год рождения не может быть в будущем');
+      return;
+    }
+    try {
+      await horsesApi.create({
+        name: formData.get('name') as string,
+        gender: formData.get('gender') as string,
+        color: formData.get('color') as string,
+        birthYear,
+        birthCountry: formData.get('birthCountry') as string || 'Россия',
+        fatherId: formData.get('fatherId') ? parseInt(formData.get('fatherId') as string) : undefined,
+        motherId: formData.get('motherId') ? parseInt(formData.get('motherId') as string) : undefined,
+        status: formData.get('status') as string || 'in_training',
+        photos: ['https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?w=800'],
+      });
+      setShowAddModal(false);
+      const data = await horsesApi.getAll({ ownerId: user?.id });
+      setHorses(data);
+    } catch (error: any) {
+      alert('Ошибка при добавлении лошади: ' + (error.message || 'Неизвестная ошибка'));
+    }
+  };
 
   if (loading) return <div style={{ color: C.textMuted, textAlign: 'center', padding: '2rem' }}>Загрузка...</div>;
+
+  const stallions = allHorses.filter((h: any) => h.gender === 'stallion');
+  const mares = allHorses.filter((h: any) => h.gender === 'mare');
 
   return (
     <div className="space-y-6">
@@ -2132,7 +2282,7 @@ function FarmDashboard() {
           <h3 style={{ fontFamily: "'Unbounded', sans-serif", color: C.textPrimary, fontSize: '0.95rem', fontWeight: 700 }}>
             Список лошадей завода
           </h3>
-          <button style={{ background: C.accentGold, color: C.textPrimary, border: 'none', borderRadius: '6px', padding: '0.4rem 1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+          <button onClick={() => setShowAddModal(true)} style={{ background: C.accentGold, color: C.textPrimary, border: 'none', borderRadius: '6px', padding: '0.4rem 1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
             <Plus size={14} /> Добавить
           </button>
         </div>
@@ -2146,21 +2296,21 @@ function FarmDashboard() {
               </tr>
             </thead>
             <tbody>
-              {horses.slice(0, 10).map((h, idx) => {
+              {horses.map((h, idx) => {
                 const statusMap: Record<string, string> = { for_sale: '#16a34a', reserved: C.accentAmber, in_training: C.accentGold, resting: C.textMuted, breeding: C.accentSienna, sold: '#dc2626', retired: C.textMuted };
                 const badge = statusMap[(h.status as string)] || C.textMuted;
                 return (
                   <tr key={h.id} style={{ borderBottom: `1px solid ${C.border}`, background: idx % 2 === 0 ? 'transparent' : C.bgPrimary + '55' }}>
                     <td style={{ padding: '0.75rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                        <img src={h.photos?.[0] || 'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?w=800'} alt={h.name} style={{ width: '36px', height: '36px', borderRadius: '6px', objectFit: 'cover' }} />
+                        <img src={getPhoto(h)} alt={h.name} style={{ width: '36px', height: '36px', borderRadius: '6px', objectFit: 'cover' }} />
                         <Link to={`/horse/${h.id}`} style={{ color: C.textPrimary, fontWeight: 700, textDecoration: 'none' }} className="hover:opacity-70">{h.name}</Link>
                       </div>
                     </td>
                     <td style={{ padding: '0.75rem', color: C.textSecondary }}>
                       {h.gender === 'stallion' ? 'Жеребец' : h.gender === 'mare' ? 'Кобыла' : 'Мерин'}
                     </td>
-                    <td style={{ padding: '0.75rem', color: C.textSecondary }}>{h.birthYear}</td>
+                    <td style={{ padding: '0.75rem', color: C.textSecondary }}>{h.birthYear || h.birth_year}</td>
                     <td style={{ padding: '0.75rem' }}>
                       <span style={{ color: badge, fontSize: '0.8rem', fontWeight: 600 }}>
                         {(['for_sale', 'reserved', 'in_training', 'resting', 'breeding', 'sold', 'retired'] as const).includes(h.status as any) ? { for_sale: 'На продаже', reserved: 'Забронирован', in_training: 'В тренинге', resting: 'Отдых', breeding: 'Разведение', sold: 'Продан', retired: 'Выбыл' }[(h.status as string)] : h.status}
@@ -2182,6 +2332,77 @@ function FarmDashboard() {
           </table>
         </div>
       </div>
+
+      {showAddModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
+          <div style={{ background: C.white, borderRadius: '12px', padding: '1.5rem', width: '100%', maxWidth: '500px', maxHeight: '90vh', overflow: 'auto' }}>
+            <h3 style={{ fontFamily: "'Unbounded', sans-serif", color: C.textPrimary, fontSize: '1rem', fontWeight: 700, marginBottom: '1.25rem' }}>
+              Добавить лошадь
+            </h3>
+            <form onSubmit={handleAddHorse} className="space-y-4">
+              <div>
+                <label style={{ color: C.textSecondary, fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>Кличка</label>
+                <input name="name" required style={{ width: '100%', background: C.bgSecondary, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '0.6rem', fontSize: '0.82rem', color: C.textPrimary }} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ color: C.textSecondary, fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>Пол</label>
+                  <select name="gender" required style={{ width: '100%', background: C.bgSecondary, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '0.6rem', fontSize: '0.82rem', color: C.textPrimary }}>
+                    <option value="stallion">Жеребец</option>
+                    <option value="mare">Кобыла</option>
+                    <option value="gelding">Мерин</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ color: C.textSecondary, fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>Год рождения</label>
+                  <input name="birthYear" type="number" required min="1900" max={new Date().getFullYear()} style={{ width: '100%', background: C.bgSecondary, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '0.6rem', fontSize: '0.82rem', color: C.textPrimary }} />
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ color: C.textSecondary, fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>Масть</label>
+                  <input name="color" required placeholder="Например: Вороной" style={{ width: '100%', background: C.bgSecondary, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '0.6rem', fontSize: '0.82rem', color: C.textPrimary }} />
+                </div>
+                <div>
+                  <label style={{ color: C.textSecondary, fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>Страна рождения</label>
+                  <input name="birthCountry" defaultValue="Россия" style={{ width: '100%', background: C.bgSecondary, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '0.6rem', fontSize: '0.82rem', color: C.textPrimary }} />
+                </div>
+              </div>
+              <div>
+                <label style={{ color: C.textSecondary, fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>Отец</label>
+                <select name="fatherId" style={{ width: '100%', background: C.bgSecondary, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '0.6rem', fontSize: '0.82rem', color: C.textPrimary }}>
+                  <option value="">Не указан</option>
+                  {stallions.map((h: any) => (
+                    <option key={h.id} value={h.id}>{h.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={{ color: C.textSecondary, fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>Мать</label>
+                <select name="motherId" style={{ width: '100%', background: C.bgSecondary, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '0.6rem', fontSize: '0.82rem', color: C.textPrimary }}>
+                  <option value="">Не указана</option>
+                  {mares.map((h: any) => (
+                    <option key={h.id} value={h.id}>{h.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={{ color: C.textSecondary, fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>Статус</label>
+                <select name="status" style={{ width: '100%', background: C.bgSecondary, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '0.6rem', fontSize: '0.82rem', color: C.textPrimary }}>
+                  <option value="in_training">В тренинге</option>
+                  <option value="for_sale">На продаже</option>
+                  <option value="breeding">В разведении</option>
+                  <option value="resting">На отдыхе</option>
+                </select>
+              </div>
+              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem' }}>
+                <button type="submit" style={{ flex: 1, background: C.accentGold, color: C.textPrimary, border: 'none', borderRadius: '8px', padding: '0.75rem', fontSize: '0.875rem', fontWeight: 700, cursor: 'pointer' }}>Добавить</button>
+                <button type="button" onClick={() => setShowAddModal(false)} style={{ flex: 1, background: C.bgSecondary, color: C.textSecondary, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '0.75rem', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer' }}>Отмена</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2248,7 +2469,7 @@ export default function Dashboard() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
-        {!isRegularUser && !isOwner && (
+        {user && userRole !== 'guest' && (
           <div style={{ background: `linear-gradient(135deg, ${C.textPrimary} 0%, #4A3C2E 100%)`, borderRadius: '12px', padding: '1.25rem 1.5rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
             <div style={{ background: 'rgba(201,169,98,0.2)', borderRadius: '10px', padding: '0.75rem' }}>
               {(() => { const Icon = currentRole.icon; return <Icon size={22} style={{ color: C.accentGold }} />; })()}

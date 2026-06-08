@@ -59,6 +59,7 @@ export class HorseService {
         trainerId: row.trainer_id,
         breederId: row.breeder_id,
         totalEarnings: row.total_earnings,
+        price: row.price,
         wins: stats?.wins || 0,
         podiums: stats?.podiums || 0,
         totalRaces: stats?.totalRaces || 0,
@@ -170,6 +171,7 @@ export class HorseService {
       fatherId: horse.father_id,
       motherId: horse.mother_id,
       totalEarnings: horse.total_earnings,
+      price: horse.price,
       owner,
       breeder,
       trainer,
@@ -181,7 +183,7 @@ export class HorseService {
 
   create(horseData: Omit<Horse, 'id' | 'createdAt' | 'updatedAt'>): Horse {
     const result = db.prepare(
-      'INSERT INTO horses (name, gender, color, birth_year, birth_country, breeder_id, owner_id, trainer_id, father_id, mother_id, status, photos, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+      'INSERT INTO horses (name, gender, color, birth_year, birth_country, breeder_id, owner_id, trainer_id, father_id, mother_id, status, photos, description, price) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     ).run(
       horseData.name,
       horseData.gender,
@@ -195,7 +197,8 @@ export class HorseService {
       horseData.motherId || null,
       horseData.status,
       JSON.stringify(horseData.photos || []),
-      horseData.description || null
+      horseData.description || null,
+      horseData.price || null
     );
 
     const id = result.lastInsertRowid as number;
@@ -211,6 +214,8 @@ export class HorseService {
     if (horseData.birthYear) { fields.push('birth_year = ?'); values.push(horseData.birthYear); }
     if (horseData.ownerId !== undefined) { fields.push('owner_id = ?'); values.push(horseData.ownerId); }
     if (horseData.trainerId !== undefined) { fields.push('trainer_id = ?'); values.push(horseData.trainerId); }
+    if (horseData.fatherId !== undefined) { fields.push('father_id = ?'); values.push(horseData.fatherId); }
+    if (horseData.motherId !== undefined) { fields.push('mother_id = ?'); values.push(horseData.motherId); }
     if (horseData.status) { fields.push('status = ?'); values.push(horseData.status); }
     if (horseData.photos) { fields.push('photos = ?'); values.push(JSON.stringify(horseData.photos)); }
     if (horseData.description !== undefined) { fields.push('description = ?'); values.push(horseData.description); }

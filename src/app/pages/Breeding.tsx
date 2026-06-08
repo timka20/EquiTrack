@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Calendar, CheckCircle, Baby, Heart, Plus, Calculator, TrendingUp, Info, Sparkles } from 'lucide-react';
 import { C } from '../data/colors';
 import { breedingsApi, horsesApi } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -38,6 +39,7 @@ interface Breeding {
 }
 
 export default function Breeding() {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'season' | 'foals' | 'calculator' | 'plan'>('season');
   const [breedings, setBreedings] = useState<Breeding[]>([]);
   const [foals, setFoals] = useState<any[]>([]);
@@ -47,6 +49,7 @@ export default function Breeding() {
   const [selectedStallion, setSelectedStallion] = useState<string>('');
   const [selectedMare, setSelectedMare] = useState<string>('');
   const [calculated, setCalculated] = useState(false);
+  const [planError, setPlanError] = useState<string>('');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -109,6 +112,33 @@ export default function Breeding() {
   const handleCalculate = () => {
     if (selectedStallion && selectedMare) {
       setCalculated(true);
+    }
+  };
+
+  const canEditStatus = () => {
+    try {
+      const userStr = localStorage.getItem('user');
+      if (!userStr) return false;
+      
+      const userData = JSON.parse(userStr);
+      const allowedRoles = ['admin', 'owner_stud', 'owner_private'];
+      return allowedRoles.includes(userData.role);
+    } catch {
+      return false;
+    }
+  };
+
+  const handleStatusChange = async (recordId: number, newStatus: string) => {
+    try {
+      if (!canEditStatus()) {
+        alert('У вас нет прав на изменение статуса разведения. Доступно только для администраторов и владельцев');
+        return;
+      }
+
+      await breedingsApi.update(recordId, { status: newStatus });
+      setBreedings(prev => prev.map(b => b.id === recordId ? { ...b, status: newStatus } : b));
+    } catch (err: any) {
+      alert('Ошибка при обновлении статуса: ' + (err?.message || 'Неизвестная ошибка'));
     }
   };
 
@@ -205,7 +235,33 @@ export default function Breeding() {
                         <div className="flex flex-col md:flex-row">
                           <div style={{ background: sc.bg, padding: '1.5rem', minWidth: '200px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '0.5rem', borderRight: `1px solid ${C.border}` }}>
                             <Heart size={24} style={{ color: sc.color }} />
-                            <span style={{ color: sc.color, fontSize: '0.82rem', fontWeight: 700 }}>{sc.label}</span>
+                            {canEditStatus() ? (
+                              <select
+                                value={record.status}
+                                onChange={(e) => handleStatusChange(record.id, e.target.value)}
+                                style={{
+                                  background: 'transparent',
+                                  border: `1px solid ${sc.color}44`,
+                                  color: sc.color,
+                                  fontSize: '0.82rem',
+                                  fontWeight: 700,
+                                  borderRadius: '6px',
+                                  padding: '0.25rem 0.5rem',
+                                  cursor: 'pointer',
+                                  appearance: 'none',
+                                  fontFamily: "'Unbounded', sans-serif",
+                                }}
+                              >
+                                <option value="planned">Запланировано</option>
+                                <option value="completed">Проведено</option>
+                                <option value="pregnancy_confirmed">Жерёбость подтверждена</option>
+                                <option value="not_confirmed">Жерёбость не подтверждена</option>
+                              </select>
+                            ) : (
+                              <span style={{ color: sc.color, fontSize: '0.82rem', fontWeight: 700 }}>
+                                {statusConfig[record.status]?.label || 'Неизвестно'}
+                              </span>
+                            )}
                             <span style={{ color: C.textMuted, fontSize: '0.75rem' }}>{formatDate(record.plannedDate)}</span>
                           </div>
                           <div style={{ flex: 1, padding: '1.5rem' }}>
@@ -403,15 +459,35 @@ export default function Breeding() {
                 </h3>
                 <form onSubmit={async (e) => {
                   e.preventDefault();
+                  setPlanError('');
+
+                  if (!user) {
+                    setPlanError('Чтобы создать вязку, вам необходимо авторизоваться на портале');
+                    return;
+                  }
+
                   const formData = new FormData(e.currentTarget);
+                  const plannedDate = formData.get('plannedDate') as string;
+
+                  const date = new Date(plannedDate);
+                  const now = new Date();
+                  now.setHours(0, 0, 0, 0);
+                  const tomorrow = new Date(now);
+                  tomorrow.setDate(tomorrow.getDate() + 1);
+
+                  if (!plannedDate || date < tomorrow) {
+                    setPlanError('Дата вязки должна быть в будущем — не раньше завтрашнего дня');
+                    return;
+                  }
+
                   try {
                     await breedingsApi.create({
                       mareId: parseInt(formData.get('mareId') as string),
                       stallionId: parseInt(formData.get('stallionId') as string),
-                      plannedDate: formData.get('plannedDate') as string,
+                      plannedDate,
                       notes: formData.get('notes') as string,
                     });
-                    alert('Вязка успешно запланирована!');
+                    setPlanError('');
                     setActiveTab('season');
 
                     const breedingsData = await breedingsApi.getAll();
@@ -425,8 +501,13 @@ export default function Breeding() {
                       mareName: b.mare_name,
                       stallionName: b.stallion_name,
                     })));
-                  } catch (error) {
-                    alert('Ошибка при планировании вязки');
+                  } catch (err: any) {
+                    const msg = err?.message || 'Ошибка при планировании вязки';
+                    if (msg.toLowerCase().includes('authentication required') || msg.toLowerCase().includes('не авторизован') || msg.toLowerCase().includes('401')) {
+                      setPlanError('Чтобы создать вязку, вам необходимо авторизоваться на портале');
+                    } else {
+                      setPlanError(msg);
+                    }
                   }
                 }}>
                   <div style={{ display: 'grid', gap: '1.25rem', maxWidth: '500px' }}>
@@ -450,12 +531,18 @@ export default function Breeding() {
                     </div>
                     <div>
                       <label style={{ display: 'block', color: C.textMuted, fontSize: '0.75rem', marginBottom: '0.5rem' }}>Планируемая дата</label>
-                      <input type="date" name="plannedDate" required style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: `1px solid ${C.border}`, background: C.bgSecondary }} />
+                      <input type="date" name="plannedDate" required style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: `1px solid ${planError ? '#ef4444' : C.border}`, background: C.bgSecondary }} />
                     </div>
                     <div>
                       <label style={{ display: 'block', color: C.textMuted, fontSize: '0.75rem', marginBottom: '0.5rem' }}>Примечания</label>
                       <textarea name="notes" rows={3} style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: `1px solid ${C.border}`, background: C.bgSecondary }} />
                     </div>
+                    {planError && (
+                      <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', padding: '0.75rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                        <span style={{ color: '#dc2626', fontSize: '0.82rem', fontWeight: 600 }}>{planError}</span>
+                      </div>
+                    )}
                     <button type="submit" style={{ background: C.accentGold, color: '#FFF', padding: '0.875rem', borderRadius: '8px', border: 'none', fontWeight: 600, cursor: 'pointer' }}>
                       Запланировать вязку
                     </button>

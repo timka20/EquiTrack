@@ -11,6 +11,7 @@ import Dashboard from './pages/Dashboard';
 import HorseDetail from './pages/HorseDetail';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import ForgotPassword from './pages/ForgotPassword';
 import Favorites from './pages/Favorites';
 import { CircleDot } from 'lucide-react';
 import { C } from './data/colors';
@@ -86,6 +87,7 @@ export const router = createBrowserRouter([
     children: [
       { path: 'login', Component: Login },
       { path: 'register', Component: Register },
+      { path: 'forgot-password', Component: ForgotPassword },
     ],
   },
 ]);

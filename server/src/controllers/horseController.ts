@@ -28,6 +28,7 @@ export class HorseController {
           photos: h.photos,
           description: h.description,
           status: h.status,
+          price: h.price,
           ownerName: h.ownerName,
           stats: (h as any).stats
         })) as any;
@@ -61,6 +62,7 @@ export class HorseController {
           birthCountry: horse.birth_country,
           photos: horse.photos,
           description: horse.description,
+          price: horse.price,
           pedigree: horse.pedigree,
           stats: horse.stats,
           raceHistory: horse.raceHistory
@@ -76,7 +78,7 @@ export class HorseController {
 
   async create(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const { name, gender, color, birthYear, birthCountry, fatherId, motherId, status, photos, description, breederId } = request.body as {
+      const { name, gender, color, birthYear, birthCountry, fatherId, motherId, status, photos, description, breederId, price } = request.body as {
         name: string;
         gender: HorseGender;
         color: string;
@@ -88,6 +90,7 @@ export class HorseController {
         photos?: string[];
         description?: string;
         breederId?: number;
+        price?: number;
       };
 
       const ownerId = request.user?.id;
@@ -104,7 +107,8 @@ export class HorseController {
         motherId,
         status: status || HorseStatus.IN_TRAINING,
         photos: photos || [],
-        description
+        description,
+        price
       });
 
       return reply.status(201).send(horse);

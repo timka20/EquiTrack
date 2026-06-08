@@ -70,15 +70,16 @@ const requireAuth = async (request: any, reply: any) => {
 
 const requireRole = (...roles: UserRole[]) => async (request: any, reply: any) => {
   await fastify.authenticate(request, reply);
-  const allowedRoles = [UserRole.ADMIN, ...roles];
-  if (!request.user || !allowedRoles.includes(request.user.role)) {
-    reply.status(403).send({ error: 'Insufficient permissions', e: request.user });
-    throw new Error('Insufficient permissions');
+  const allowed = new Set([UserRole.ADMIN, ...roles]);
+  const userRole = request.user?.role;
+  if (!request.user || !allowed.has(userRole)) {
+    return reply.status(403).send({ error: 'Недостаточно прав для выполнения операции' });
   }
 };
 
 fastify.post('/api/auth/login', authController.login);
 fastify.post('/api/auth/register', authController.register);
+fastify.post('/api/auth/forgot-password', authController.forgotPassword);
 fastify.get('/api/auth/me', { preHandler: requireAuth }, authController.me);
 fastify.put('/api/auth/profile', { preHandler: requireAuth }, authController.updateProfile);
 
@@ -277,14 +278,20 @@ fastify.put('/api/users/:id/password', { preHandler: requireRole(UserRole.ADMIN)
   try {
     const { id } = request.params as { id: string };
     const { password } = request.body as { password: string };
-    const bcrypt = await import('bcryptjs');
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const db = (await import('./config/database.js')).db;
-    db.prepare('UPDATE users SET password = ? WHERE id = ?').run(hashedPassword, parseInt(id));
+    if (!password || password.length < 6) {
+      return reply.status(400).send({ error: 'Пароль должен быть не менее 6 символов' });
+    }
+    const { hashPassword } = await import('./utils/helpers.js');
+    const hashedPassword = await hashPassword(password);
+    const userService = (await import('./services/userService.js')).userService;
+    const updated = userService.update(parseInt(id), { password: hashedPassword });
+    if (!updated) {
+      return reply.status(404).send({ error: 'Пользователь не найден' });
+    }
     return reply.send({ success: true });
   } catch (error) {
     console.error('Update password error:', error);
-    return reply.status(500).send({ error: 'Internal server error' });
+    return reply.status(500).send({ error: 'Ошибка при изменении пароля' });
   }
 });
 

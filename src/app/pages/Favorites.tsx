@@ -68,7 +68,20 @@ export default function Favorites() {
               <div key={horse.id} style={{ background: C.white, borderRadius: '12px', border: `1px solid ${C.border}`, overflow: 'hidden' }}>
                 <div style={{ position: 'relative' }}>
                   <img 
-                    src={horse.photos?.[0] || (horse.photos ? JSON.parse(horse.photos)[0] : 'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?w=800')} 
+                    src={(() => {
+                      try {
+                        if (typeof horse.photos === 'string') {
+                          const parsed = JSON.parse(horse.photos);
+                          return parsed[0] || 'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?w=800';
+                        }
+                        if (Array.isArray(horse.photos)) {
+                          return horse.photos[0] || 'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?w=800';
+                        }
+                        return 'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?w=800';
+                      } catch {
+                        return 'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?w=800';
+                      }
+                    })()} 
                     alt={horse.name}
                     style={{ width: '100%', height: '200px', objectFit: 'cover' }}
                   />

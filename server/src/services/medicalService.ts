@@ -9,7 +9,7 @@ export class MedicalService {
         FROM medical_records mr
         LEFT JOIN users u ON mr.veterinarian_id = u.id
         WHERE mr.horse_id = ?
-        ORDER BY mr.date DESC
+        ORDER BY mr.record_date DESC
       `).all(horseId);
       return rows as any[];
     } catch (error) {
@@ -20,7 +20,7 @@ export class MedicalService {
 
   createMedicalRecord(record: Omit<MedicalRecord, 'id' | 'createdAt'>): MedicalRecord {
     const result = db.prepare(
-      'INSERT INTO medical_records (horse_id, veterinarian_id, record_type, date, description, diagnosis, treatment, status, medications) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+      'INSERT INTO medical_records (horse_id, veterinarian_id, type, record_date, description, diagnosis, treatment, restrictions) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
     ).run(
       record.horseId,
       record.veterinarianId,
@@ -29,8 +29,7 @@ export class MedicalService {
       record.description,
       record.diagnosis || null,
       record.treatment || null,
-      record.restrictions || 'none',
-      record.medications || null
+      record.restrictions || null
     );
 
     const id = result.lastInsertRowid as number;
@@ -42,13 +41,11 @@ export class MedicalService {
     const fields: string[] = [];
     const values: any[] = [];
 
-    if (record.record_type) { fields.push('record_type = ?'); values.push(record.record_type); }
+    if (record.record_type) { fields.push('type = ?'); values.push(record.record_type); }
     if (record.description) { fields.push('description = ?'); values.push(record.description); }
     if (record.diagnosis !== undefined) { fields.push('diagnosis = ?'); values.push(record.diagnosis); }
     if (record.treatment !== undefined) { fields.push('treatment = ?'); values.push(record.treatment); }
-    if (record.medications !== undefined) { fields.push('medications = ?'); values.push(record.medications); }
     if (record.restrictions !== undefined) { fields.push('restrictions = ?'); values.push(record.restrictions); }
-    if (record.status !== undefined) { fields.push('status = ?'); values.push(record.status); }
 
     if (fields.length === 0) return false;
 
@@ -69,7 +66,7 @@ export class MedicalService {
         FROM vaccinations v
         LEFT JOIN users u ON v.veterinarian_id = u.id
         WHERE v.horse_id = ?
-        ORDER BY v.date DESC
+        ORDER BY v.vaccination_date DESC
       `).all(horseId);
       return rows as any[];
     } catch (error) {
@@ -80,7 +77,7 @@ export class MedicalService {
 
   createVaccination(vaccination: Omit<Vaccination, 'id' | 'createdAt'>): Vaccination {
     const result = db.prepare(
-      'INSERT INTO vaccinations (horse_id, name, date, next_date, veterinarian_id, notes) VALUES (?, ?, ?, ?, ?, ?)'
+      'INSERT INTO vaccinations (horse_id, name, vaccination_date, next_date, veterinarian_id, notes) VALUES (?, ?, ?, ?, ?, ?)'
     ).run(
       vaccination.horseId,
       vaccination.name,
@@ -120,7 +117,7 @@ export class MedicalService {
     const row = db.prepare(`
       SELECT restrictions FROM medical_records
       WHERE horse_id = ? AND restrictions IS NOT NULL AND restrictions != ''
-      ORDER BY date DESC
+      ORDER BY record_date DESC
       LIMIT 1
     `).get(horseId) as { restrictions: string } | undefined;
 
@@ -137,9 +134,9 @@ export class MedicalService {
     ).get(horseId) as { count: number } | undefined;
 
     const lastCheckup = db.prepare(`
-      SELECT date FROM medical_records
-      WHERE horse_id = ? AND record_type = 'Плановый осмотр'
-      ORDER BY date DESC
+      SELECT record_date as date FROM medical_records
+      WHERE horse_id = ? AND type = 'Плановый осмотр'
+      ORDER BY record_date DESC
       LIMIT 1
     `).get(horseId) as { date: string } | undefined;
 

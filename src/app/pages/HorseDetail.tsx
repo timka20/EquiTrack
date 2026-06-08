@@ -5,6 +5,36 @@ import { C } from '../data/colors';
 import { horsesApi, medicalApi } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 
+function translateMedicalType(type: string): string {
+  const map: Record<string, string> = {
+    routine: 'Плановый осмотр',
+    checkup: 'Осмотр',
+    treatment: 'Лечение',
+    injury: 'Травма',
+    trauma: 'Травма',
+    vaccination: 'Вакцинация',
+    surgery: 'Операция',
+    examination: 'Обследование',
+    'Плановый осмотр': 'Плановый осмотр',
+    'Лечение': 'Лечение',
+    'Травма': 'Травма',
+    'Вакцинация': 'Вакцинация',
+  };
+  return map[type?.trim()] || type || 'Запись';
+}
+
+function translateMedicalDescription(desc: string): string {
+  const map: Record<string, string> = {
+    'Regular checkup': 'Регулярный осмотр',
+    'General examination': 'Общий осмотр',
+    'Annual vaccination': 'Ежегодная вакцинация',
+    'Vaccination': 'Вакцинация',
+    'Minor tendon strain': 'Небольшое растяжение сухожилия',
+    'Routine check': 'Плановый осмотр',
+  };
+  return map[desc?.trim()] || desc || '';
+}
+
 function formatMoney(amount: number | string | undefined | null) {
   if (!amount && amount !== 0) return '—';
   const num = typeof amount === 'string' ? parseFloat(amount) : amount;
@@ -18,6 +48,76 @@ const statusColors: Record<string, string> = {
   training: C.accentGold, rest: C.textMuted, stud: C.accentAmber,
   sold: '#dc2626', retired: C.textMuted, for_sale: '#16a34a', reserved: C.accentSienna,
 };
+
+function PedigreeBranch({ parent, accentColor, secondaryColor, label }: {
+  parent?: { name?: string; color?: string; birthYear?: number; father?: { name?: string } | null; mother?: { name?: string } | null } | null;
+  accentColor: string;
+  secondaryColor: string;
+  label: string;
+}) {
+  if (!parent?.name) {
+    return (
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end' }}>
+        <div style={{ width: '100%', maxWidth: '220px', background: `linear-gradient(135deg, ${accentColor}15, ${secondaryColor}10)`, border: `2px solid ${accentColor}40`, borderRadius: '12px', padding: '1.25rem', textAlign: 'center' }}>
+          <p style={{ color: C.textMuted, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700 }}>{label}</p>
+          <p style={{ color: C.textPrimary, fontSize: '1.1rem', fontWeight: 700 }}>—</p>
+        </div>
+      </div>
+    );
+  }
+
+  const hasGrandfather = !!parent.father?.name;
+  const hasGrandmother = !!parent.mother?.name;
+  const hasAnyGrandparent = hasGrandfather || hasGrandmother;
+  const grandfatherLabel = label === 'Отец' ? 'Отец отца' : 'Отец матери';
+  const grandmotherLabel = label === 'Отец' ? 'Мать отца' : 'Мать матери';
+
+  return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      {hasAnyGrandparent && (
+        <>
+          <div style={{ display: 'flex', width: '100%' }}>
+            {hasGrandfather && (
+              <div style={{ flex: 1, display: 'flex', justifyContent: 'center', padding: '0 0.5rem' }}>
+                <div style={{ width: '100%', maxWidth: '160px', background: C.bgSecondary, border: `1px solid ${C.border}`, borderRadius: '10px', padding: '1rem', textAlign: 'center' }}>
+                  <p style={{ color: C.textMuted, fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.5rem', fontWeight: 700 }}>{grandfatherLabel}</p>
+                  <p style={{ color: C.textPrimary, fontSize: '0.95rem', fontWeight: 700 }}>{parent.father?.name}</p>
+                </div>
+              </div>
+            )}
+            {hasGrandmother && (
+              <div style={{ flex: 1, display: 'flex', justifyContent: 'center', padding: '0 0.5rem' }}>
+                <div style={{ width: '100%', maxWidth: '160px', background: C.bgSecondary, border: `1px solid ${C.border}`, borderRadius: '10px', padding: '1rem', textAlign: 'center' }}>
+                  <p style={{ color: C.textMuted, fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.5rem', fontWeight: 700 }}>{grandmotherLabel}</p>
+                  <p style={{ color: C.textPrimary, fontSize: '0.95rem', fontWeight: 700 }}>{parent.mother?.name}</p>
+                </div>
+              </div>
+            )}
+          </div>
+          <div style={{ display: 'flex', width: hasGrandfather && hasGrandmother ? '50%' : '25%', justifyContent: 'space-between' }}>
+            {hasGrandfather && <div style={{ width: '2px', height: '16px', background: C.border }}></div>}
+            {hasGrandmother && <div style={{ width: '2px', height: '16px', background: C.border }}></div>}
+          </div>
+          <div style={{ display: 'flex', width: hasGrandfather && hasGrandmother ? '50%' : '25%', height: '16px' }}>
+            {hasGrandfather && (
+              <div style={{ flex: 1, borderTop: `2px solid ${C.border}`, borderRight: hasGrandmother ? `2px solid ${C.border}` : 'none' }}></div>
+            )}
+            {hasGrandmother && (
+              <div style={{ flex: 1, borderTop: `2px solid ${C.border}` }}></div>
+            )}
+          </div>
+        </>
+      )}
+
+      <div style={{ width: '100%', maxWidth: '220px', background: `linear-gradient(135deg, ${accentColor}15, ${secondaryColor}10)`, border: `2px solid ${accentColor}40`, borderRadius: '12px', padding: '1.25rem', textAlign: 'center', zIndex: 2 }}>
+        <p style={{ color: C.textMuted, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '0.6rem', fontWeight: 700 }}>{label}</p>
+        <p style={{ color: C.textPrimary, fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.5rem' }}>{parent.name}</p>
+        {parent.color && <p style={{ color: C.textSecondary, fontSize: '0.75rem' }}>{parent.color}</p>}
+        {parent.birthYear && <p style={{ color: C.textMuted, fontSize: '0.72rem', marginTop: '0.35rem' }}>р. {parent.birthYear}</p>}
+      </div>
+    </div>
+  );
+}
 
 export default function HorseDetail() {
   const { id } = useParams();
@@ -34,6 +134,10 @@ export default function HorseDetail() {
 
   const [showVaccineModal, setShowVaccineModal] = useState(false);
   const [showMedicalModal, setShowMedicalModal] = useState(false);
+  const [showPedigreeModal, setShowPedigreeModal] = useState(false);
+  const [allHorses, setAllHorses] = useState<any[]>([]);
+  const [selectedFatherId, setSelectedFatherId] = useState<string>('');
+  const [selectedMotherId, setSelectedMotherId] = useState<string>('');
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
@@ -41,11 +145,15 @@ export default function HorseDetail() {
       if (!id) return;
       try {
         setLoading(true);
-        const [horseData, medicalData, vaccinesData] = await Promise.all([
+        const [horseData, medicalData, vaccinesData, allHorsesData] = await Promise.all([
           horsesApi.getById(id),
           medicalApi.getByHorseId(id).catch(() => []),
-          medicalApi.getVaccinations(id).catch(() => [])
+          medicalApi.getVaccinations(id).catch(() => []),
+          horsesApi.getAll().catch(() => [])
         ]);
+        setAllHorses(allHorsesData);
+        setSelectedFatherId(horseData.fatherId ? String(horseData.fatherId) : '');
+        setSelectedMotherId(horseData.motherId ? String(horseData.motherId) : '');
         console.log('Horse data:', horseData);
         console.log('Race history:', horseData.raceHistory);
         console.log('Pedigree:', horseData.pedigree);
@@ -88,26 +196,45 @@ export default function HorseDetail() {
   const handleAddVaccination = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
+    const date = formData.get('date') as string;
+    const nextDate = formData.get('nextDate') as string;
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    if (new Date(date) < today) {
+      alert('Дата прививки не может быть в прошлом');
+      return;
+    }
+    if (nextDate && new Date(nextDate) <= new Date(date)) {
+      alert('Следующая дата должна быть позже даты прививки');
+      return;
+    }
     try {
       await medicalApi.createVaccination(id!, {
         name: formData.get('name') as string,
-        date: formData.get('date') as string,
-        nextDate: formData.get('nextDate') as string,
+        date,
+        nextDate,
         notes: formData.get('notes') as string
       });
       setShowVaccineModal(false);
       setRefreshKey(prev => prev + 1);
-    } catch (error) {
-      alert('Ошибка при добавлении прививки');
+    } catch (error: any) {
+      alert('Ошибка при добавлении прививки: ' + (error.message || 'Неизвестная ошибка'));
     }
   };
 
   const handleAddMedicalRecord = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
+    const date = formData.get('date') as string;
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    if (new Date(date) < today) {
+      alert('Дата записи не может быть в прошлом');
+      return;
+    }
     try {
       await medicalApi.createRecord(id!, {
-        date: formData.get('date') as string,
+        date,
         record_type: formData.get('record_type') as string,
         description: formData.get('description') as string,
         diagnosis: formData.get('diagnosis') as string,
@@ -116,8 +243,21 @@ export default function HorseDetail() {
       });
       setShowMedicalModal(false);
       setRefreshKey(prev => prev + 1);
-    } catch (error) {
-      alert('Ошибка при добавлении медицинской записи');
+    } catch (error: any) {
+      alert('Ошибка при добавлении медицинской записи: ' + (error.message || 'Неизвестная ошибка'));
+    }
+  };
+
+  const handleUpdatePedigree = async () => {
+    try {
+      await horsesApi.update(id!, {
+        fatherId: selectedFatherId ? parseInt(selectedFatherId) : null,
+        motherId: selectedMotherId ? parseInt(selectedMotherId) : null,
+      });
+      setShowPedigreeModal(false);
+      setRefreshKey(prev => prev + 1);
+    } catch (error: any) {
+      alert('Ошибка при обновлении родословной: ' + (error.message || 'Неизвестная ошибка'));
     }
   };
 
@@ -143,18 +283,22 @@ export default function HorseDetail() {
 
   const ownerName = horse.owner?.firstName 
     ? `${horse.owner.firstName} ${horse.owner.lastName || ''}`.trim()
-    : horse.owner?.name || horse.ownerName || horse.owner_first_name 
-      ? `${horse.owner_first_name || ''} ${horse.owner_last_name || ''}`.trim()
-      : '—';
+    : horse.owner?.name 
+      ? horse.owner.name
+      : horse.owner_first_name 
+        ? `${horse.owner_first_name || ''} ${horse.owner_last_name || ''}`.trim()
+        : null;
 
   const breederName = horse.breeder?.firstName
     ? `${horse.breeder.firstName} ${horse.breeder.lastName || ''}`.trim()
-    : horse.breeder?.name || horse.breederName || horse.breeder_first_name
-      ? `${horse.breeder_first_name || ''} ${horse.breeder_last_name || ''}`.trim()
-      : '—';
+    : horse.breeder?.name
+      ? horse.breeder.name
+      : horse.breeder_first_name
+        ? `${horse.breeder_first_name || ''} ${horse.breeder_last_name || ''}`.trim()
+        : null;
 
-  const fatherName = horse.pedigree?.father?.name || horse.father_name || horse.fatherName || '—';
-  const motherName = horse.pedigree?.mother?.name || horse.mother_name || horse.motherName || '—';
+  const fatherName = horse.pedigree?.father?.name || horse.father_name || horse.fatherName || null;
+  const motherName = horse.pedigree?.mother?.name || horse.mother_name || horse.motherName || null;
 
   return (
     <div style={{ background: C.bgPrimary, fontFamily: "'Unbounded', sans-serif", minHeight: '100vh' }}>
@@ -172,7 +316,20 @@ export default function HorseDetail() {
 
             <div style={{ position: 'relative', flexShrink: 0 }}>
               <img
-                src={horse.photos|| horse.photo || 'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?w=800'}
+                src={(() => {
+                  try {
+                    if (typeof horse.photos === 'string') {
+                      const parsed = JSON.parse(horse.photos);
+                      return parsed[0] || 'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?w=800';
+                    }
+                    if (Array.isArray(horse.photos)) {
+                      return horse.photos[0] || 'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?w=800';
+                    }
+                    return horse.photo || 'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?w=800';
+                  } catch {
+                    return 'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?w=800';
+                  }
+                })()}
                 alt={horse.name}
                 style={{ width: 'clamp(260px, 30vw, 340px)', height: '260px', objectFit: 'cover', borderRadius: '16px', border: '3px solid rgba(201,169,98,0.3)' }}
               />
@@ -200,8 +357,9 @@ export default function HorseDetail() {
                 {horse.name}
               </h1>
               <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-                {horse.birthYear} г.р. · {horse.birthCountry} · Заводчик: {breederName}
-                <span> · Владелец: {ownerName}</span>
+                {horse.birthYear} г.р. · {horse.birthCountry}
+                {breederName ? ` · Заводчик: ${breederName}` : ''}
+                {ownerName ? ` · Владелец: ${ownerName}` : ''}
               </p>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
@@ -384,124 +542,43 @@ export default function HorseDetail() {
           <div>
 
             <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: '12px', padding: '2rem', marginBottom: '2rem', overflowX: 'auto' }}>
-              <h3 style={{ fontFamily: "'Unbounded', sans-serif", color: C.textPrimary, fontSize: '1.25rem', fontWeight: 700, marginBottom: '2rem', textAlign: 'center' }}>
-                Родословная {horse.name}
-              </h3>
+              <div className="flex items-center justify-between mb-6">
+                <h3 style={{ fontFamily: "'Unbounded', sans-serif", color: C.textPrimary, fontSize: '1.25rem', fontWeight: 700, textAlign: 'center', flex: 1 }}>
+                  Родословная {horse.name}
+                </h3>
+                {(user?.role === 'admin' || user?.id === horse.ownerId) && (
+                  <button
+                    onClick={() => setShowPedigreeModal(true)}
+                    style={{ background: C.accentGold, color: C.textPrimary, border: 'none', borderRadius: '6px', padding: '0.4rem 1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+                  >
+                    Изменить
+                  </button>
+                )}
+              </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: '800px', margin: '0 auto' }}>
 
                 <div style={{ display: 'flex', width: '100%' }}>
+                  <PedigreeBranch parent={horse.pedigree?.father} label="Отец" accentColor={C.accentGold} secondaryColor={C.accentAmber} />
+                  <PedigreeBranch parent={horse.pedigree?.mother} label="Мать" accentColor={C.accentSienna} secondaryColor={C.accentAmber} />
+                </div>
 
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-
-                    <div style={{ display: 'flex', width: '100%' }}>
-
-                      <div style={{ flex: 1, display: 'flex', justifyContent: 'center', padding: '0 0.5rem' }}>
-                        <div style={{ width: '100%', maxWidth: '160px', background: C.bgSecondary, border: `1px solid ${C.border}`, borderRadius: '10px', padding: '1rem', textAlign: 'center' }}>
-                          <p style={{ color: C.textMuted, fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.5rem', fontWeight: 700 }}>Отец отца</p>
-                          <p style={{ color: C.textPrimary, fontSize: '0.95rem', fontWeight: 700 }}>
-                            {horse.pedigree?.father?.father?.name || horse.pedigree?.father?.father || '—'}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div style={{ flex: 1, display: 'flex', justifyContent: 'center', padding: '0 0.5rem' }}>
-                        <div style={{ width: '100%', maxWidth: '160px', background: C.bgSecondary, border: `1px solid ${C.border}`, borderRadius: '10px', padding: '1rem', textAlign: 'center' }}>
-                          <p style={{ color: C.textMuted, fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.5rem', fontWeight: 700 }}>Мать отца</p>
-                          <p style={{ color: C.textPrimary, fontSize: '0.95rem', fontWeight: 700 }}>
-                            {horse.pedigree?.father?.mother?.name || horse.pedigree?.father?.mother || '—'}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
+                {(horse.pedigree?.father?.name || horse.pedigree?.mother?.name) && (
+                  <>
                     <div style={{ display: 'flex', width: '50%', justifyContent: 'space-between' }}>
-                      <div style={{ width: '2px', height: '16px', background: C.border }}></div>
-                      <div style={{ width: '2px', height: '16px', background: C.border }}></div>
+                      {horse.pedigree?.father?.name && <div style={{ width: '2px', height: '24px', background: C.border }}></div>}
+                      {horse.pedigree?.mother?.name && <div style={{ width: '2px', height: '24px', background: C.border }}></div>}
                     </div>
-                    <div style={{ display: 'flex', width: '50%', height: '16px' }}>
-                      <div style={{ flex: 1, borderTop: `2px solid ${C.border}`, borderRight: `2px solid ${C.border}` }}></div>
-                      <div style={{ flex: 1, borderTop: `2px solid ${C.border}` }}></div>
-                    </div>
-
-                    <div style={{ width: '100%', maxWidth: '220px', background: `linear-gradient(135deg, ${C.accentGold}15, ${C.accentAmber}10)`, border: `2px solid ${C.accentGold}40`, borderRadius: '12px', padding: '1.25rem', textAlign: 'center', zIndex: 2 }}>
-                      <p style={{ color: C.textMuted, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '0.6rem', fontWeight: 700 }}>Отец</p>
-                      <p style={{ color: C.textPrimary, fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.5rem' }}>
-                        {horse.pedigree?.father?.name || '—'}
-                      </p>
-                      {horse.pedigree?.father && (
-                        <>
-                          <p style={{ color: C.textSecondary, fontSize: '0.75rem' }}>
-                            {horse.pedigree.father.color ? `${horse.pedigree.father.color}` : ''}
-                          </p>
-                          <p style={{ color: C.textMuted, fontSize: '0.72rem', marginTop: '0.35rem' }}>
-                            р. {horse.pedigree.father.birthYear || ''}
-                          </p>
-                        </>
+                    <div style={{ display: 'flex', width: '50%', height: '24px' }}>
+                      {horse.pedigree?.father?.name && (
+                        <div style={{ flex: 1, borderTop: `2px solid ${C.border}`, borderRight: horse.pedigree?.mother?.name ? `2px solid ${C.border}` : 'none' }}></div>
+                      )}
+                      {horse.pedigree?.mother?.name && (
+                        <div style={{ flex: 1, borderTop: `2px solid ${C.border}` }}></div>
                       )}
                     </div>
-                  </div>
-
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-
-                    <div style={{ display: 'flex', width: '100%' }}>
-
-                      <div style={{ flex: 1, display: 'flex', justifyContent: 'center', padding: '0 0.5rem' }}>
-                        <div style={{ width: '100%', maxWidth: '160px', background: C.bgSecondary, border: `1px solid ${C.border}`, borderRadius: '10px', padding: '1rem', textAlign: 'center' }}>
-                          <p style={{ color: C.textMuted, fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.5rem', fontWeight: 700 }}>Отец матери</p>
-                          <p style={{ color: C.textPrimary, fontSize: '0.95rem', fontWeight: 700 }}>
-                            {horse.pedigree?.mother?.father?.name || horse.pedigree?.mother?.father || '—'}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div style={{ flex: 1, display: 'flex', justifyContent: 'center', padding: '0 0.5rem' }}>
-                        <div style={{ width: '100%', maxWidth: '160px', background: C.bgSecondary, border: `1px solid ${C.border}`, borderRadius: '10px', padding: '1rem', textAlign: 'center' }}>
-                          <p style={{ color: C.textMuted, fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.5rem', fontWeight: 700 }}>Мать матери</p>
-                          <p style={{ color: C.textPrimary, fontSize: '0.95rem', fontWeight: 700 }}>
-                            {horse.pedigree?.mother?.mother?.name || horse.pedigree?.mother?.mother || '—'}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', width: '50%', justifyContent: 'space-between' }}>
-                      <div style={{ width: '2px', height: '16px', background: C.border }}></div>
-                      <div style={{ width: '2px', height: '16px', background: C.border }}></div>
-                    </div>
-                    <div style={{ display: 'flex', width: '50%', height: '16px' }}>
-                      <div style={{ flex: 1, borderTop: `2px solid ${C.border}`, borderRight: `2px solid ${C.border}` }}></div>
-                      <div style={{ flex: 1, borderTop: `2px solid ${C.border}` }}></div>
-                    </div>
-
-                    <div style={{ width: '100%', maxWidth: '220px', background: `linear-gradient(135deg, ${C.accentSienna}15, ${C.accentAmber}10)`, border: `2px solid ${C.accentSienna}40`, borderRadius: '12px', padding: '1.25rem', textAlign: 'center', zIndex: 2 }}>
-                      <p style={{ color: C.textMuted, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '0.6rem', fontWeight: 700 }}>Мать</p>
-                      <p style={{ color: C.textPrimary, fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.5rem' }}>
-                        {horse.pedigree?.mother?.name || '—'}
-                      </p>
-                      {horse.pedigree?.mother && (
-                        <>
-                          <p style={{ color: C.textSecondary, fontSize: '0.75rem' }}>
-                            {horse.pedigree.mother.color ? `${horse.pedigree.mother.color}` : ''}
-                          </p>
-                          <p style={{ color: C.textMuted, fontSize: '0.72rem', marginTop: '0.35rem' }}>
-                            р. {horse.pedigree.mother.birthYear || ''}
-                          </p>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                </div>
-
-                <div style={{ display: 'flex', width: '50%', justifyContent: 'space-between' }}>
-                  <div style={{ width: '2px', height: '24px', background: C.border }}></div>
-                  <div style={{ width: '2px', height: '24px', background: C.border }}></div>
-                </div>
-                <div style={{ display: 'flex', width: '50%', height: '24px' }}>
-                  <div style={{ flex: 1, borderTop: `2px solid ${C.border}`, borderRight: `2px solid ${C.border}` }}></div>
-                  <div style={{ flex: 1, borderTop: `2px solid ${C.border}` }}></div>
-                </div>
+                  </>
+                )}
 
                 <div style={{ width: '100%', maxWidth: '280px', background: `linear-gradient(135deg, ${C.accentGold}25, ${C.accentSienna}15)`, border: `3px solid ${C.accentGold}60`, borderRadius: '14px', padding: '1.5rem', textAlign: 'center', zIndex: 2 }}>
                   <p style={{ color: C.accentGold, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: '0.6rem', fontWeight: 700 }}>👑 Объект разведения</p>
@@ -595,8 +672,8 @@ export default function HorseDetail() {
                       <div key={i} style={{ padding: '0.875rem', background: C.bgSecondary, borderRadius: '8px' }}>
                         <div className="flex items-start justify-between gap-2">
                           <div>
-                            <p style={{ color: C.textPrimary, fontWeight: 700, fontSize: '0.875rem' }}>{record.type}</p>
-                            <p style={{ color: C.textSecondary, fontSize: '0.82rem' }}>{record.description}</p>
+                            <p style={{ color: C.textPrimary, fontWeight: 700, fontSize: '0.875rem' }}>{translateMedicalType(record.type)}</p>
+                            <p style={{ color: C.textSecondary, fontSize: '0.82rem' }}>{translateMedicalDescription(record.description)}</p>
                             {record.diagnosis && (
                               <p style={{ color: C.textMuted, fontSize: '0.75rem', marginTop: '0.25rem' }}>Диагноз: {record.diagnosis}</p>
                             )}
@@ -716,6 +793,48 @@ export default function HorseDetail() {
                       </button>
                     </div>
                   </form>
+                </div>
+              </div>
+            )}
+
+            {showPedigreeModal && (
+              <div style={{
+                position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                zIndex: 1000, padding: '1rem'
+              }} onClick={() => setShowPedigreeModal(false)}>
+                <div style={{ background: C.white, borderRadius: '12px', padding: '1.5rem', width: '100%', maxWidth: '450px' }} onClick={e => e.stopPropagation()}>
+                  <h3 style={{ fontFamily: "'Unbounded', sans-serif", color: C.textPrimary, fontSize: '1rem', fontWeight: 700, marginBottom: '1.25rem' }}>
+                    Изменить родословную
+                  </h3>
+                  <div className="space-y-4">
+                    <div>
+                      <label style={{ color: C.textSecondary, fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>Отец</label>
+                      <select value={selectedFatherId} onChange={e => setSelectedFatherId(e.target.value)} style={{ width: '100%', background: C.bgSecondary, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '0.6rem', fontSize: '0.82rem', color: C.textPrimary }}>
+                        <option value="">Не указан</option>
+                        {allHorses.filter((h: any) => h.gender === 'stallion' && h.id !== horse?.id).map((h: any) => (
+                          <option key={h.id} value={h.id}>{h.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ color: C.textSecondary, fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>Мать</label>
+                      <select value={selectedMotherId} onChange={e => setSelectedMotherId(e.target.value)} style={{ width: '100%', background: C.bgSecondary, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '0.6rem', fontSize: '0.82rem', color: C.textPrimary }}>
+                        <option value="">Не указана</option>
+                        {allHorses.filter((h: any) => h.gender === 'mare' && h.id !== horse?.id).map((h: any) => (
+                          <option key={h.id} value={h.id}>{h.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem' }}>
+                      <button onClick={handleUpdatePedigree} style={{ flex: 1, background: C.accentGold, color: C.textPrimary, border: 'none', borderRadius: '8px', padding: '0.75rem', fontSize: '0.875rem', fontWeight: 700, cursor: 'pointer' }}>
+                        Сохранить
+                      </button>
+                      <button onClick={() => setShowPedigreeModal(false)} style={{ flex: 1, background: C.bgSecondary, color: C.textSecondary, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '0.75rem', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer' }}>
+                        Отмена
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}

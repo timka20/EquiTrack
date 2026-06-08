@@ -46,6 +46,12 @@ export const authApi = {
       body: JSON.stringify(data),
     }),
 
+  forgotPassword: (email: string) =>
+    fetchApi('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
+
   me: () => fetchApi('/auth/me'),
 
   updateProfile: (data: any) => 
@@ -69,6 +75,8 @@ export const horsesApi = {
   getStats: () => fetchApi('/horses/stats'),
 
   getForSale: () => fetchApi('/horses/for-sale'),
+
+  getMyHorses: () => fetchApi('/my-horses'),
 
   getPedigree: (id: number | string) => fetchApi(`/horses/${id}/pedigree`),
 
@@ -176,6 +184,16 @@ export const trainingsApi = {
   delete: (id: number | string) => 
     fetchApi(`/trainings/${id}`, {
       method: 'DELETE',
+    }),
+};
+
+export const jockeyReportsApi = {
+  getAll: () => fetchApi('/jockey-reports'),
+
+  create: (data: any) =>
+    fetchApi('/jockey-reports', {
+      method: 'POST',
+      body: JSON.stringify(data),
     }),
 };
 

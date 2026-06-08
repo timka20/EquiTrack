@@ -4,6 +4,26 @@ import { Mail, Lock, Eye, EyeOff, ArrowRight, User } from 'lucide-react';
 import { C } from '../data/colors';
 import { useAuth } from '../contexts/AuthContext';
 
+function formatPhone(value: string): string {
+  const digits = value.replace(/\D/g, '').slice(0, 11);
+  if (!digits) return '';
+  if (digits.length <= 1) return `+7 (${digits}`;
+  if (digits.length <= 4) return `+7 (${digits.slice(1)}`;
+  if (digits.length <= 7) return `+7 (${digits.slice(1, 4)}) ${digits.slice(4)}`;
+  if (digits.length <= 9) return `+7 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+  return `+7 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7, 9)}-${digits.slice(9, 11)}`;
+}
+
+function validateName(name: string, allowHyphen = false): boolean {
+  if (!name || name.length < 2) return false;
+  if (allowHyphen) return /^[A-Za-zА-Яа-яЁё]+(-[A-Za-zА-Яа-яЁё]+)?$/.test(name);
+  return /^[A-Za-zА-Яа-яЁё]+$/.test(name);
+}
+
+function validateEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
 export default function Register() {
   const navigate = useNavigate();
   const { register } = useAuth();
@@ -20,18 +40,44 @@ export default function Register() {
   const [error, setError] = useState('');
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    const { name, value } = e.target;
+    if (name === 'phone') {
+      setFormData(prev => ({ ...prev, phone: formatPhone(value) }));
+    } else {
+      setFormData(prev => ({ ...prev, [name]: value }));
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
+
+    if (!validateName(formData.firstName)) {
+      setError('Имя может содержать только буквы');
+      return;
+    }
+
+    if (!validateName(formData.lastName, true)) {
+      setError('Фамилия может содержать только буквы и одно тире');
+      return;
+    }
+
+    if (!validateEmail(formData.email)) {
+      setError('Укажите корректный email');
+      return;
+    }
+
+    if (formData.password.length < 6) {
+      setError('Пароль должен быть не менее 6 символов');
+      return;
+    }
+
     if (formData.password !== formData.confirmPassword) {
       setError('Пароли не совпадают');
       return;
     }
 
     setIsLoading(true);
-    setError('');
 
     try {
       await register({

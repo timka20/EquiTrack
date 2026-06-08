@@ -18,6 +18,11 @@ export class UserService {
     return row as User | null;
   }
 
+  findByPhone(phone: string): User | null {
+    const row = db.prepare('SELECT * FROM users WHERE phone = ?').get(phone);
+    return row as User | null;
+  }
+
   async create(userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'>): Promise<User> {
     const hashedPassword = await hashPassword(userData.password);
 
@@ -44,10 +49,11 @@ export class UserService {
 
     if (userData.firstName) { fields.push('first_name = ?'); values.push(userData.firstName); }
     if (userData.lastName) { fields.push('last_name = ?'); values.push(userData.lastName); }
-    if (userData.phone) { fields.push('phone = ?'); values.push(userData.phone); }
-    if (userData.avatarUrl) { fields.push('avatar_url = ?'); values.push(userData.avatarUrl); }
+    if (userData.phone !== undefined) { fields.push('phone = ?'); values.push(userData.phone); }
+    if (userData.avatarUrl !== undefined) { fields.push('avatar_url = ?'); values.push(userData.avatarUrl); }
     if (userData.isActive !== undefined) { fields.push('is_active = ?'); values.push(userData.isActive ? 1 : 0); }
     if (userData.role) { fields.push('role = ?'); values.push(userData.role); }
+    if (userData.password) { fields.push('password = ?'); values.push(userData.password); }
 
     if (fields.length === 0) return this.findById(id);
 

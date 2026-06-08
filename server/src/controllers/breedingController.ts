@@ -2,6 +2,15 @@ import { FastifyRequest, FastifyReply } from 'fastify';
 import { breedingService } from '../services/breedingService.js';
 import { BreedingStatus, FoalStatus } from '../types/index.js';
 
+function isFutureDateNotToday(dateStr: string): boolean {
+  const date = new Date(dateStr);
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  return date >= tomorrow;
+}
+
 export class BreedingController {
   async getAll(request: FastifyRequest, reply: FastifyReply) {
     try {
@@ -16,7 +25,7 @@ export class BreedingController {
       return reply.send(breedings);
     } catch (error) {
       console.error('Get breedings error:', error);
-      return reply.status(500).send({ error: 'Internal server error' });
+      return reply.status(500).send({ error: 'Ошибка при получении данных' });
     }
   }
 
@@ -26,13 +35,13 @@ export class BreedingController {
       const breeding = await breedingService.findById(parseInt(id));
 
       if (!breeding) {
-        return reply.status(404).send({ error: 'Breeding not found' });
+        return reply.status(404).send({ error: 'Запись не найдена' });
       }
 
       return reply.send(breeding);
     } catch (error) {
       console.error('Get breeding error:', error);
-      return reply.status(500).send({ error: 'Internal server error' });
+      return reply.status(500).send({ error: 'Ошибка при получении данных' });
     }
   }
 
@@ -45,6 +54,10 @@ export class BreedingController {
         notes?: string;
       };
 
+      if (!plannedDate || !isFutureDateNotToday(plannedDate)) {
+        return reply.status(400).send({ error: 'Дата планирования должна быть не раньше завтрашнего дня' });
+      }
+
       const breeding = await breedingService.create({
         mareId,
         stallionId,
@@ -56,7 +69,7 @@ export class BreedingController {
       return reply.status(201).send(breeding);
     } catch (error) {
       console.error('Create breeding error:', error);
-      return reply.status(500).send({ error: 'Internal server error' });
+      return reply.status(500).send({ error: 'Ошибка при создании записи' });
     }
   }
 
@@ -65,6 +78,10 @@ export class BreedingController {
       const { id } = request.params as { id: string };
       const updateData = request.body as any;
 
+      if (updateData.plannedDate && !isFutureDateNotToday(updateData.plannedDate)) {
+        return reply.status(400).send({ error: 'Дата планирования должна быть не раньше завтрашнего дня' });
+      }
+
       if (updateData.plannedDate) updateData.plannedDate = new Date(updateData.plannedDate);
       if (updateData.actualDate) updateData.actualDate = new Date(updateData.actualDate);
       if (updateData.expectedFoalingDate) updateData.expectedFoalingDate = new Date(updateData.expectedFoalingDate);
@@ -72,13 +89,13 @@ export class BreedingController {
       const breeding = await breedingService.update(parseInt(id), updateData);
 
       if (!breeding) {
-        return reply.status(404).send({ error: 'Breeding not found' });
+        return reply.status(404).send({ error: 'Запись не найдена' });
       }
 
       return reply.send(breeding);
     } catch (error) {
       console.error('Update breeding error:', error);
-      return reply.status(500).send({ error: 'Internal server error' });
+      return reply.status(500).send({ error: 'Ошибка при обновлении записи' });
     }
   }
 
@@ -88,13 +105,13 @@ export class BreedingController {
       const deleted = await breedingService.delete(parseInt(id));
 
       if (!deleted) {
-        return reply.status(404).send({ error: 'Breeding not found' });
+        return reply.status(404).send({ error: 'Запись не найдена' });
       }
 
       return reply.send({ success: true });
     } catch (error) {
       console.error('Delete breeding error:', error);
-      return reply.status(500).send({ error: 'Internal server error' });
+      return reply.status(500).send({ error: 'Ошибка при удалении записи' });
     }
   }
 
@@ -118,7 +135,7 @@ export class BreedingController {
       return reply.status(201).send(foal);
     } catch (error) {
       console.error('Add foal error:', error);
-      return reply.status(500).send({ error: 'Internal server error' });
+      return reply.status(500).send({ error: 'Ошибка при добавлении жеребенка' });
     }
   }
 
@@ -134,13 +151,13 @@ export class BreedingController {
       const updated = await breedingService.updateFoalStatus(parseInt(foalId), status, { price, buyerId });
 
       if (!updated) {
-        return reply.status(404).send({ error: 'Foal not found' });
+        return reply.status(404).send({ error: 'Жеребенок не найден' });
       }
 
       return reply.send({ success: true });
     } catch (error) {
       console.error('Update foal status error:', error);
-      return reply.status(500).send({ error: 'Internal server error' });
+      return reply.status(500).send({ error: 'Ошибка при обновлении статуса' });
     }
   }
 
@@ -156,7 +173,7 @@ export class BreedingController {
       return reply.send(foals);
     } catch (error) {
       console.error('Get foals error:', error);
-      return reply.status(500).send({ error: 'Internal server error' });
+      return reply.status(500).send({ error: 'Ошибка при получении данных' });
     }
   }
 
@@ -166,7 +183,7 @@ export class BreedingController {
       return reply.send(stats);
     } catch (error) {
       console.error('Get breeding stats error:', error);
-      return reply.status(500).send({ error: 'Internal server error' });
+      return reply.status(500).send({ error: 'Ошибка при получении статистики' });
     }
   }
 
@@ -177,14 +194,14 @@ export class BreedingController {
       return reply.send(prediction);
     } catch (error) {
       console.error('Predict price error:', error);
-      return reply.status(500).send({ error: 'Internal server error' });
+      return reply.status(500).send({ error: 'Ошибка при расчете прогноза' });
     }
   }
 
   async getMyBreedings(request: FastifyRequest, reply: FastifyReply) {
     try {
       if (!request.user) {
-        return reply.status(401).send({ error: 'Not authenticated' });
+        return reply.status(401).send({ error: 'Не авторизован' });
       }
 
       const { db } = await import('../config/database.js');
@@ -210,7 +227,7 @@ export class BreedingController {
       return reply.send(breedings);
     } catch (error) {
       console.error('Get my breedings error:', error);
-      return reply.status(500).send({ error: 'Internal server error' });
+      return reply.status(500).send({ error: 'Ошибка при получении данных' });
     }
   }
 }

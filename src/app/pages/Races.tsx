@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Calendar, MapPin, Clock, Trophy, ChevronDown, Users, Check } from 'lucide-react';
+import { Calendar, MapPin, Clock, Trophy, ChevronDown, Users, Check, Crown, X } from 'lucide-react';
 import { C } from '../data/colors';
-import { racesApi } from '../services/api';
+import { racesApi, horsesApi } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -51,6 +52,7 @@ interface Race {
 }
 
 export default function Races() {
+  const { user } = useAuth();
   const [races, setRaces] = useState<Race[]>([]);
   const [filteredRaces, setFilteredRaces] = useState<Race[]>([]);
   const [selectedHippodrome, setSelectedHippodrome] = useState('Все');
@@ -60,6 +62,14 @@ export default function Races() {
   const [selectedRace, setSelectedRace] = useState<Race | null>(null);
   const [raceDetails, setRaceDetails] = useState<any>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
+
+  const [showRegisterModal, setShowRegisterModal] = useState(false);
+  const [registerRaceId, setRegisterRaceId] = useState<number | null>(null);
+  const [myHorses, setMyHorses] = useState<any[]>([]);
+  const [selectedHorseId, setSelectedHorseId] = useState<string>('');
+  const [loadingHorses, setLoadingHorses] = useState(false);
+
+  const canRegister = user?.role === 'owner_private' || user?.role === 'owner_stud' || user?.role === 'admin' || user?.role === 'trainer';
 
   useEffect(() => {
     const fetchRaces = async () => {
@@ -91,15 +101,54 @@ export default function Races() {
     setFilteredRaces(filtered);
   }, [selectedHippodrome, selectedStatus, races]);
 
-  const handleRegister = async (raceId: number) => {
+  const openRegisterModal = async (raceId: number) => {
+    if (!canRegister) {
+      alert('Только владельцы лошадей и тренеры могут подавать заявки на участие');
+      return;
+    }
+    setRegisterRaceId(raceId);
+    setShowRegisterModal(true);
+    setSelectedHorseId('');
+    setLoadingHorses(true);
     try {
-      setRegistering(raceId);
-      await racesApi.register(raceId);
-      setRegistering(null);
-
+      const horses = await horsesApi.getMyHorses();
+      setMyHorses(horses || []);
     } catch (error) {
+      console.error('Error fetching my horses:', error);
+      setMyHorses([]);
+    } finally {
+      setLoadingHorses(false);
+    }
+  };
+
+  const closeRegisterModal = () => {
+    setShowRegisterModal(false);
+    setRegisterRaceId(null);
+    setMyHorses([]);
+    setSelectedHorseId('');
+  };
+
+  const confirmRegister = async () => {
+    if (!registerRaceId || !selectedHorseId) {
+      alert('Выберите лошадь для участия в забеге');
+      return;
+    }
+    try {
+      setRegistering(registerRaceId);
+      await racesApi.register(registerRaceId, { horseId: parseInt(selectedHorseId) });
+      setRegistering(null);
+      closeRegisterModal();
+      alert('Заявка на участие успешно подана!');
+    } catch (error: any) {
       console.error('Registration error:', error);
       setRegistering(null);
+      alert('Ошибка при подаче заявки: ' + (error.message || 'Неизвестная ошибка'));
+    }
+  };
+
+  const handleRegisterFromDetails = () => {
+    if (selectedRace) {
+      openRegisterModal(selectedRace.id);
     }
   };
 
@@ -274,7 +323,7 @@ export default function Races() {
                         <div className="flex gap-2">
                           {race.status === 'registration_open' && (
                             <button
-                              onClick={() => handleRegister(race.id)}
+                              onClick={() => openRegisterModal(race.id)}
                               disabled={registering === race.id}
                               style={{
                                 background: registering === race.id ? C.bgSecondary : C.accentGold,
@@ -456,7 +505,7 @@ export default function Races() {
 
                   {selectedRace.status === 'registration_open' && (
                     <button
-                      onClick={() => handleRegister(selectedRace.id)}
+                      onClick={handleRegisterFromDetails}
                       disabled={registering === selectedRace.id}
                       style={{
                         width: '100%', background: registering === selectedRace.id ? C.bgSecondary : C.accentGold,
@@ -469,6 +518,137 @@ export default function Races() {
                     </button>
                   )}
                 </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showRegisterModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 1000, padding: '1rem'
+        }} onClick={closeRegisterModal}>
+          <div 
+            style={{ 
+              background: C.white, borderRadius: '16px', 
+              width: '100%', maxWidth: '500px', maxHeight: '90vh', overflow: 'auto'
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ padding: '1.5rem', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <h3 style={{ fontFamily: "'Unbounded', sans-serif", color: C.textPrimary, fontSize: '1.1rem', fontWeight: 700 }}>
+                Подача заявки на участие
+              </h3>
+              <button 
+                onClick={closeRegisterModal}
+                style={{ background: 'none', border: 'none', color: C.textMuted, cursor: 'pointer', fontSize: '1.5rem', lineHeight: 1 }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ padding: '1.5rem' }}>
+              {loadingHorses ? (
+                <div style={{ textAlign: 'center', padding: '2rem' }}>
+                  <p style={{ color: C.textMuted }}>Загрузка лошадей...</p>
+                </div>
+              ) : myHorses.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '2rem' }}>
+                  <Crown size={40} style={{ color: C.border, margin: '0 auto 1rem' }} />
+                  <p style={{ color: C.textMuted, fontSize: '0.95rem', marginBottom: '0.5rem' }}>
+                    У вас нет лошадей для участия в забеге
+                  </p>
+                  <p style={{ color: C.textSecondary, fontSize: '0.82rem' }}>
+                    Добавьте лошадь в каталог, чтобы подать заявку
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <p style={{ color: C.textSecondary, fontSize: '0.85rem', marginBottom: '1rem' }}>
+                    Выберите лошадь, которую хотите зарегистрировать на забег:
+                  </p>
+                  {myHorses.map((horse: any) => (
+                    <div
+                      key={horse.id}
+                      onClick={() => setSelectedHorseId(String(horse.id))}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '1rem',
+                        padding: '1rem', borderRadius: '10px', cursor: 'pointer',
+                        border: selectedHorseId === String(horse.id) ? `2px solid ${C.accentGold}` : `1px solid ${C.border}`,
+                        background: selectedHorseId === String(horse.id) ? 'rgba(201,169,98,0.08)' : C.bgSecondary,
+                      }}
+                    >
+                      <img
+                        src={(() => {
+                          try {
+                            if (typeof horse.photos === 'string') {
+                              const parsed = JSON.parse(horse.photos);
+                              return parsed[0] || 'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?w=800';
+                            }
+                            if (Array.isArray(horse.photos)) {
+                              return horse.photos[0] || 'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?w=800';
+                            }
+                            return 'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?w=800';
+                          } catch {
+                            return 'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?w=800';
+                          }
+                        })()}
+                        alt={horse.name}
+                        style={{ width: '48px', height: '48px', borderRadius: '8px', objectFit: 'cover', flexShrink: 0 }}
+                      />
+                      <div className="flex-1">
+                        <p style={{ color: C.textPrimary, fontWeight: 700, fontSize: '0.9rem' }}>{horse.name}</p>
+                        <p style={{ color: C.textMuted, fontSize: '0.78rem' }}>
+                          {horse.color} · {horse.gender === 'stallion' ? 'Жеребец' : horse.gender === 'mare' ? 'Кобыла' : 'Мерин'} · {horse.birthYear} г.р.
+                        </p>
+                      </div>
+                      {selectedHorseId === String(horse.id) && (
+                        <Check size={18} style={{ color: C.accentGold, flexShrink: 0 }} />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {myHorses.length > 0 && (
+                <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem' }}>
+                  <button
+                    onClick={confirmRegister}
+                    disabled={!selectedHorseId || registering === registerRaceId}
+                    style={{
+                      flex: 1,
+                      background: !selectedHorseId || registering === registerRaceId ? C.bgSecondary : C.accentGold,
+                      color: C.textPrimary,
+                      border: 'none',
+                      borderRadius: '8px',
+                      padding: '0.75rem',
+                      fontSize: '0.875rem',
+                      fontWeight: 700,
+                      cursor: !selectedHorseId || registering === registerRaceId ? 'not-allowed' : 'pointer',
+                      opacity: !selectedHorseId || registering === registerRaceId ? 0.7 : 1,
+                    }}
+                  >
+                    {registering === registerRaceId ? 'Подтверждение...' : 'Подать заявку'}
+                  </button>
+                  <button
+                    onClick={closeRegisterModal}
+                    style={{
+                      flex: 1,
+                      background: C.bgSecondary,
+                      color: C.textSecondary,
+                      border: `1px solid ${C.border}`,
+                      borderRadius: '8px',
+                      padding: '0.75rem',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Отмена
+                  </button>
+                </div>
               )}
             </div>
           </div>

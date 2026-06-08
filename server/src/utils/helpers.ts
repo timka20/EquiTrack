@@ -1,12 +1,12 @@
 
-export async function hashPassword(password: string): Promise<string> {
+import bcrypt from 'bcryptjs';
 
-  return password; 
+export async function hashPassword(password: string): Promise<string> {
+  return bcrypt.hash(password, 10);
 }
 
 export async function comparePassword(password: string, hash: string): Promise<boolean> {
-
-  return password === hash;
+  return bcrypt.compare(password, hash);
 }
 
 export function generateRandomString(length: number = 10): string {

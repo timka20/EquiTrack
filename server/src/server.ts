@@ -4,9 +4,17 @@ import cors from '@fastify/cors';
 import jwt from '@fastify/jwt';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
+import staticPlugin from '@fastify/static';
+import multipart from '@fastify/multipart';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 import { env } from './config/env.js';
 import { testConnection } from './config/database.js';
 import { authenticate } from './middleware/auth.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 import { authController } from './controllers/authController.js';
 import { userController } from './controllers/userController.js';
@@ -62,6 +70,13 @@ await fastify.register(swaggerUi, {
     deepLinking: false
   }
 });
+
+await fastify.register(staticPlugin, {
+  root: path.join(__dirname, '../../public'),
+  prefix: '/',
+});
+
+await fastify.register(multipart, { limits: { fileSize: 5 * 1024 * 1024 } });
 
 await fastify.register(authenticate);
 
@@ -293,6 +308,27 @@ fastify.put('/api/users/:id/password', { preHandler: requireRole(UserRole.ADMIN)
   } catch (error) {
     console.error('Update password error:', error);
     return reply.status(500).send({ error: 'Ошибка при изменении пароля' });
+  }
+});
+
+fastify.post('/api/upload', async (request, reply) => {
+  try {
+    const data = await request.file();
+    if (!data) {
+      return reply.status(400).send({ error: 'No file uploaded' });
+    }
+    const uploadDir = path.join(__dirname, '../../public/images/horses');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    const ext = path.extname(data.filename) || '.jpg';
+    const filename = `horse_${Date.now()}_${Math.random().toString(36).substring(2, 8)}${ext}`;
+    const filepath = path.join(uploadDir, filename);
+    await fs.promises.writeFile(filepath, await data.toBuffer());
+    return reply.send({ url: `/images/horses/${filename}` });
+  } catch (error) {
+    console.error('Upload error:', error);
+    return reply.status(500).send({ error: 'Upload failed' });
   }
 });
 

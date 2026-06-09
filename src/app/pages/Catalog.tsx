@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router';
 import { Search, Filter, Heart, Star, ChevronDown, Plus } from 'lucide-react';
 import { C } from '../data/colors';
-import { horsesApi } from '../services/api';
+import { horsesApi, uploadApi } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 
 interface Horse {
@@ -68,6 +68,7 @@ export default function Catalog() {
   const [favorites, setFavorites] = useState<Set<number>>(new Set());
   const [showFilters, setShowFilters] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [horsePhotoFile, setHorsePhotoFile] = useState<File | null>(null);
   const [allHorses, setAllHorses] = useState<any[]>([]);
 
   const canAddHorse = user?.role === 'owner_private' || user?.role === 'owner_stud' || user?.role === 'admin';
@@ -184,10 +185,14 @@ export default function Catalog() {
   const handleAddHorse = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    const photosRaw = formData.get('photos') as string;
-    const photos = photosRaw ? photosRaw.split(',').map(p => p.trim()).filter(Boolean) : [];
 
     try {
+      let photos: string[] = [];
+      if (horsePhotoFile) {
+        const uploadRes = await uploadApi.uploadImage(horsePhotoFile);
+        photos = [uploadRes.url];
+      }
+
       await horsesApi.create({
         name: formData.get('name') as string,
         gender: formData.get('gender') as string,
@@ -201,6 +206,7 @@ export default function Catalog() {
         description: formData.get('description') as string,
         price: formData.get('price') ? parseFloat(formData.get('price') as string) : undefined,
       });
+      setHorsePhotoFile(null);
       setShowAddModal(false);
       const data = await horsesApi.getAll();
       setHorses(data);
@@ -461,7 +467,7 @@ export default function Catalog() {
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
           background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center',
           zIndex: 1000, padding: '1rem'
-        }} onClick={() => setShowAddModal(false)}>
+        }} onClick={() => { setShowAddModal(false); setHorsePhotoFile(null); }}>
           <div style={{ background: C.white, borderRadius: '12px', padding: '1.5rem', width: '100%', maxWidth: '600px', maxHeight: '90vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
             <h3 style={{ fontFamily: "'Unbounded', sans-serif", color: C.textPrimary, fontSize: '1.1rem', fontWeight: 700, marginBottom: '1.25rem' }}>
               Добавить новую лошадь
@@ -539,8 +545,9 @@ export default function Catalog() {
               </div>
 
               <div>
-                <label style={{ color: C.textSecondary, fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>Фото (URL через запятую)</label>
-                <input type="text" name="photos" placeholder="https://example.com/photo1.jpg, https://example.com/photo2.jpg" style={{ width: '100%', background: C.bgSecondary, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '0.6rem', fontSize: '0.82rem', color: C.textPrimary }} />
+                <label style={{ color: C.textSecondary, fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>Фото</label>
+                <input type="file" accept="image/*" onChange={e => setHorsePhotoFile(e.target.files?.[0] || null)} style={{ width: '100%', background: C.bgSecondary, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '0.6rem', fontSize: '0.82rem', color: C.textPrimary }} />
+                {horsePhotoFile && <p style={{ color: C.textMuted, fontSize: '0.75rem', marginTop: '0.25rem' }}>{horsePhotoFile.name}</p>}
               </div>
 
               <div>

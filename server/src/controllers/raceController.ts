@@ -5,14 +5,6 @@ import { RaceStatus, RegistrationStatus, UserRole } from '../types/index.js';
 const MAX_PRIZE_FUND = 10_000_000;
 
 function validateRaceData(data: any, isUpdate: boolean = false): { valid: boolean; error?: string } {
-  if (!isUpdate || data.date !== undefined) {
-    const date = new Date(data.date);
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
-    if (date < now) {
-      return { valid: false, error: 'Дата скачки не может быть в прошлом' };
-    }
-  }
   if (!isUpdate || data.prizeFund !== undefined) {
     const prize = Number(data.prizeFund);
     if (isNaN(prize) || prize < 0) {
@@ -190,7 +182,7 @@ export class RaceController {
   async addResults(request: FastifyRequest, reply: FastifyReply) {
     try {
       const { id } = request.params as { id: string };
-      const { results } = request.body as { results: Array<{ horseId: number; position: number; time?: string; prize?: number; notes?: string }> };
+      const { results } = request.body as { results: Array<{ horseId: number; position: number; time?: string; prize?: number; notes?: string; jockeyId?: number; trainerId?: number }> };
 
       const added = await raceService.addResults(parseInt(id), results);
 

@@ -61,6 +61,25 @@ export const authApi = {
     }),
 };
 
+export const uploadApi = {
+  uploadImage: async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await fetch(`${API_URL}/upload`, {
+      method: 'POST',
+      body: formData,
+      headers: {
+        ...(localStorage.getItem('token') ? { Authorization: `Bearer ${localStorage.getItem('token')}` } : {}),
+      },
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Upload failed' }));
+      throw new Error(error.error || 'Upload failed');
+    }
+    return response.json();
+  },
+};
+
 export const horsesApi = {
   getAll: (filters?: { status?: string; forSale?: boolean; ownerId?: number }) => {
     const params = new URLSearchParams();

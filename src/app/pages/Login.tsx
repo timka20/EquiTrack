@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { Mail, Lock, Eye, EyeOff, ArrowRight, CheckCircle, User } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, ArrowRight, CheckCircle, User, ArrowLeft } from 'lucide-react';
 import { C } from '../data/colors';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -31,6 +31,9 @@ export default function Login() {
   return (
     <div style={{ background: C.bgPrimary, minHeight: '100vh', fontFamily: "'Unbounded', sans-serif", paddingTop: '80px' }}>
       <div className="max-w-md mx-auto px-4 py-12">
+        <Link to="/" style={{ color: C.textSecondary, fontSize: '0.875rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', textDecoration: 'none', marginBottom: '1rem' }} className="hover:opacity-70 transition-opacity">
+          <ArrowLeft size={16} /> На главную
+        </Link>
         <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: '16px', padding: '2.5rem' }}>
           <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
             <div style={{ 

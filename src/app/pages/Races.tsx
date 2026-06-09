@@ -69,7 +69,7 @@ export default function Races() {
   const [selectedHorseId, setSelectedHorseId] = useState<string>('');
   const [loadingHorses, setLoadingHorses] = useState(false);
 
-  const canRegister = user?.role === 'owner_private' || user?.role === 'owner_stud' || user?.role === 'admin' || user?.role === 'trainer';
+  const canRegister = user?.role === 'owner_private' || user?.role === 'owner_stud' || user?.role === 'trainer';
 
   useEffect(() => {
     const fetchRaces = async () => {

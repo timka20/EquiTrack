@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router';
-import { ArrowLeft, Trophy, Calendar, MapPin, TrendingUp, Heart, Share2, ChevronRight, Activity, Syringe, FileText, Star, CheckCircle, User, Home, Dumbbell, UserCheck, AlertTriangle, Loader2 } from 'lucide-react';
+import { ArrowLeft, Trophy, Calendar, MapPin, TrendingUp, Heart, Share2, ChevronRight, Activity, Syringe, FileText, Star, CheckCircle, User, Home, Dumbbell, UserCheck, AlertTriangle, Loader2, Phone } from 'lucide-react';
 import { C } from '../data/colors';
 import { horsesApi, medicalApi } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -135,6 +135,7 @@ export default function HorseDetail() {
   const [showVaccineModal, setShowVaccineModal] = useState(false);
   const [showMedicalModal, setShowMedicalModal] = useState(false);
   const [showPedigreeModal, setShowPedigreeModal] = useState(false);
+  const [showContactModal, setShowContactModal] = useState(false);
   const [allHorses, setAllHorses] = useState<any[]>([]);
   const [selectedFatherId, setSelectedFatherId] = useState<string>('');
   const [selectedMotherId, setSelectedMotherId] = useState<string>('');
@@ -198,12 +199,6 @@ export default function HorseDetail() {
     const formData = new FormData(e.currentTarget);
     const date = formData.get('date') as string;
     const nextDate = formData.get('nextDate') as string;
-    const today = new Date();
-    today.setHours(0,0,0,0);
-    if (new Date(date) < today) {
-      alert('Дата прививки не может быть в прошлом');
-      return;
-    }
     if (nextDate && new Date(nextDate) <= new Date(date)) {
       alert('Следующая дата должна быть позже даты прививки');
       return;
@@ -226,12 +221,6 @@ export default function HorseDetail() {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const date = formData.get('date') as string;
-    const today = new Date();
-    today.setHours(0,0,0,0);
-    if (new Date(date) < today) {
-      alert('Дата записи не может быть в прошлом');
-      return;
-    }
     try {
       await medicalApi.createRecord(id!, {
         date,
@@ -401,7 +390,13 @@ export default function HorseDetail() {
                 </button>
                 {(horse.status === 'for_sale' || horse.status === 'reserved') && !booked && (
                   <button
-                    onClick={() => setBooked(true)}
+                    onClick={() => {
+                      if (!user) {
+                        setShowContactModal(true);
+                      } else {
+                        setBooked(true);
+                      }
+                    }}
                     style={{
                       background: C.accentGold, color: C.textPrimary,
                       border: 'none', borderRadius: '8px',
@@ -412,7 +407,7 @@ export default function HorseDetail() {
                     onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = C.btnHover; }}
                     onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = C.accentGold; }}
                   >
-                    Оставить заявку
+                    {user ? 'Оставить заявку' : 'Связаться'}
                   </button>
                 )}
                 {booked && (
@@ -546,7 +541,7 @@ export default function HorseDetail() {
                 <h3 style={{ fontFamily: "'Unbounded', sans-serif", color: C.textPrimary, fontSize: '1.25rem', fontWeight: 700, textAlign: 'center', flex: 1 }}>
                   Родословная {horse.name}
                 </h3>
-                {(user?.role === 'admin' || user?.id === horse.ownerId) && (
+                {(user && (user.role === 'admin' || user.id === horse.ownerId)) && (
                   <button
                     onClick={() => setShowPedigreeModal(true)}
                     style={{ background: C.accentGold, color: C.textPrimary, border: 'none', borderRadius: '6px', padding: '0.4rem 1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
@@ -797,47 +792,7 @@ export default function HorseDetail() {
               </div>
             )}
 
-            {showPedigreeModal && (
-              <div style={{
-                position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                zIndex: 1000, padding: '1rem'
-              }} onClick={() => setShowPedigreeModal(false)}>
-                <div style={{ background: C.white, borderRadius: '12px', padding: '1.5rem', width: '100%', maxWidth: '450px' }} onClick={e => e.stopPropagation()}>
-                  <h3 style={{ fontFamily: "'Unbounded', sans-serif", color: C.textPrimary, fontSize: '1rem', fontWeight: 700, marginBottom: '1.25rem' }}>
-                    Изменить родословную
-                  </h3>
-                  <div className="space-y-4">
-                    <div>
-                      <label style={{ color: C.textSecondary, fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>Отец</label>
-                      <select value={selectedFatherId} onChange={e => setSelectedFatherId(e.target.value)} style={{ width: '100%', background: C.bgSecondary, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '0.6rem', fontSize: '0.82rem', color: C.textPrimary }}>
-                        <option value="">Не указан</option>
-                        {allHorses.filter((h: any) => h.gender === 'stallion' && h.id !== horse?.id).map((h: any) => (
-                          <option key={h.id} value={h.id}>{h.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label style={{ color: C.textSecondary, fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>Мать</label>
-                      <select value={selectedMotherId} onChange={e => setSelectedMotherId(e.target.value)} style={{ width: '100%', background: C.bgSecondary, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '0.6rem', fontSize: '0.82rem', color: C.textPrimary }}>
-                        <option value="">Не указана</option>
-                        {allHorses.filter((h: any) => h.gender === 'mare' && h.id !== horse?.id).map((h: any) => (
-                          <option key={h.id} value={h.id}>{h.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem' }}>
-                      <button onClick={handleUpdatePedigree} style={{ flex: 1, background: C.accentGold, color: C.textPrimary, border: 'none', borderRadius: '8px', padding: '0.75rem', fontSize: '0.875rem', fontWeight: 700, cursor: 'pointer' }}>
-                        Сохранить
-                      </button>
-                      <button onClick={() => setShowPedigreeModal(false)} style={{ flex: 1, background: C.bgSecondary, color: C.textSecondary, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '0.75rem', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer' }}>
-                        Отмена
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
+
           </>
         )}
 
@@ -901,6 +856,81 @@ export default function HorseDetail() {
                 <p style={{ color: C.textMuted, fontSize: '1rem' }}>Прогноз стоимости доступен для лошадей на продаже</p>
               </div>
             )}
+          </div>
+        )}
+
+        {showPedigreeModal && (
+          <div style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 1000, padding: '1rem'
+          }} onClick={() => setShowPedigreeModal(false)}>
+            <div style={{ background: C.white, borderRadius: '12px', padding: '1.5rem', width: '100%', maxWidth: '450px' }} onClick={e => e.stopPropagation()}>
+              <h3 style={{ fontFamily: "'Unbounded', sans-serif", color: C.textPrimary, fontSize: '1rem', fontWeight: 700, marginBottom: '1.25rem' }}>
+                Изменить родословную
+              </h3>
+              <div className="space-y-4">
+                <div>
+                  <label style={{ color: C.textSecondary, fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>Отец</label>
+                  <select value={selectedFatherId} onChange={e => setSelectedFatherId(e.target.value)} style={{ width: '100%', background: C.bgSecondary, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '0.6rem', fontSize: '0.82rem', color: C.textPrimary }}>
+                    <option value="">Не указан</option>
+                    {allHorses.filter((h: any) => h.gender === 'stallion' && h.id !== horse?.id).map((h: any) => (
+                      <option key={h.id} value={h.id}>{h.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ color: C.textSecondary, fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>Мать</label>
+                  <select value={selectedMotherId} onChange={e => setSelectedMotherId(e.target.value)} style={{ width: '100%', background: C.bgSecondary, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '0.6rem', fontSize: '0.82rem', color: C.textPrimary }}>
+                    <option value="">Не указана</option>
+                    {allHorses.filter((h: any) => h.gender === 'mare' && h.id !== horse?.id).map((h: any) => (
+                      <option key={h.id} value={h.id}>{h.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem' }}>
+                  <button onClick={handleUpdatePedigree} style={{ flex: 1, background: C.accentGold, color: C.textPrimary, border: 'none', borderRadius: '8px', padding: '0.75rem', fontSize: '0.875rem', fontWeight: 700, cursor: 'pointer' }}>
+                    Сохранить
+                  </button>
+                  <button onClick={() => setShowPedigreeModal(false)} style={{ flex: 1, background: C.bgSecondary, color: C.textSecondary, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '0.75rem', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer' }}>
+                    Отмена
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showContactModal && (
+          <div style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 1000, padding: '1rem'
+          }} onClick={() => setShowContactModal(false)}>
+            <div style={{ background: C.white, borderRadius: '12px', padding: '1.5rem', width: '100%', maxWidth: '400px' }} onClick={e => e.stopPropagation()}>
+              <h3 style={{ fontFamily: "'Unbounded', sans-serif", color: C.textPrimary, fontSize: '1rem', fontWeight: 700, marginBottom: '1.25rem' }}>
+                Контакты владельца
+              </h3>
+              <div className="space-y-4">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <User size={20} style={{ color: C.accentGold }} />
+                  <div>
+                    <p style={{ color: C.textMuted, fontSize: '0.75rem' }}>Имя и фамилия</p>
+                    <p style={{ color: C.textPrimary, fontWeight: 700, fontSize: '0.95rem' }}>{ownerName || 'Не указано'}</p>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <Phone size={20} style={{ color: C.accentGold }} />
+                  <div>
+                    <p style={{ color: C.textMuted, fontSize: '0.75rem' }}>Телефон</p>
+                    <p style={{ color: C.textPrimary, fontWeight: 700, fontSize: '0.95rem' }}>{horse.ownerPhone || 'Не указан'}</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowContactModal(false)} style={{ width: '100%', background: C.accentGold, color: C.textPrimary, border: 'none', borderRadius: '8px', padding: '0.75rem', fontSize: '0.875rem', fontWeight: 700, cursor: 'pointer', marginTop: '0.5rem' }}>
+                  Закрыть
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

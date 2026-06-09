@@ -220,12 +220,14 @@ export default function Breeding() {
                   <h2 style={{ fontFamily: "'Unbounded', sans-serif", color: C.textPrimary, fontSize: '1.5rem', fontWeight: 700 }}>
                     Случной сезон 2026
                   </h2>
-                  <button
-                    onClick={() => setActiveTab('plan')}
-                    style={{ background: C.accentGold, color: C.textPrimary, border: 'none', borderRadius: '8px', padding: '0.5rem 1.25rem', fontSize: '0.875rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
-                  >
-                    <Plus size={15} /> Добавить вязку
-                  </button>
+                  {user && (user.role === 'admin' || user.role === 'owner_private' || user.role === 'owner_stud') && (
+                    <button
+                      onClick={() => setActiveTab('plan')}
+                      style={{ background: C.accentGold, color: C.textPrimary, border: 'none', borderRadius: '8px', padding: '0.5rem 1.25rem', fontSize: '0.875rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                    >
+                      <Plus size={15} /> Добавить вязку
+                    </button>
+                  )}
                 </div>
                 <div className="space-y-4">
                   {breedings.map(record => {

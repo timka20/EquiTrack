@@ -61,6 +61,8 @@ export class HorseService {
         totalEarnings: row.total_earnings,
         price: row.price,
         wins: stats?.wins || 0,
+        places: stats?.podiums || 0,
+        starts: stats?.totalRaces || 0,
         podiums: stats?.podiums || 0,
         totalRaces: stats?.totalRaces || 0,
         ownerName: row.owner_first_name && row.owner_last_name 
@@ -79,9 +81,9 @@ export class HorseService {
   findById(id: number): any | null {
     const row = db.prepare(`
       SELECT h.*, 
-        u1.first_name as owner_first_name, u1.last_name as owner_last_name,
-        u2.first_name as trainer_first_name, u2.last_name as trainer_last_name,
-        ub.first_name as breeder_first_name, ub.last_name as breeder_last_name,
+        u1.first_name as owner_first_name, u1.last_name as owner_last_name, u1.phone as owner_phone,
+        u2.first_name as trainer_first_name, u2.last_name as trainer_last_name, u2.phone as trainer_phone,
+        ub.first_name as breeder_first_name, ub.last_name as breeder_last_name, ub.phone as breeder_phone,
         f.id as father_id, f.name as father_name, f.color as father_color, f.birth_year as father_birth_year,
         m.id as mother_id, m.name as mother_name, m.color as mother_color, m.birth_year as mother_birth_year,
         ff.name as father_father_name, fm.name as father_mother_name,
@@ -107,21 +109,24 @@ export class HorseService {
       id: horse.owner_id,
       name: `${horse.owner_first_name} ${horse.owner_last_name}`.trim(),
       firstName: horse.owner_first_name,
-      lastName: horse.owner_last_name
+      lastName: horse.owner_last_name,
+      phone: horse.owner_phone
     } : null;
 
     const breeder = horse.breeder_first_name ? {
       id: horse.breeder_id,
       name: `${horse.breeder_first_name} ${horse.breeder_last_name}`.trim(),
       firstName: horse.breeder_first_name,
-      lastName: horse.breeder_last_name
+      lastName: horse.breeder_last_name,
+      phone: horse.breeder_phone
     } : null;
 
     const trainer = horse.trainer_first_name ? {
       id: horse.trainer_id,
       name: `${horse.trainer_first_name} ${horse.trainer_last_name}`.trim(),
       firstName: horse.trainer_first_name,
-      lastName: horse.trainer_last_name
+      lastName: horse.trainer_last_name,
+      phone: horse.trainer_phone
     } : null;
 
     const pedigree = {

@@ -72,12 +72,19 @@ export function Footer() {
               Для участников
             </h4>
             <ul className="space-y-2.5">
-              {['Владельцы лошадей', 'Конные заводы', 'Тренеры', 'Жокеи', 'Ветеринарные врачи', 'Администраторы'].map(role => (
-                <li key={role}>
-                  <span style={{ color: '#B8AFA6', fontFamily: "'Unbounded', sans-serif", fontSize: '0.875rem', cursor: 'pointer' }}
+              {[
+                { label: 'Владельцы лошадей', href: '/dashboard' },
+                { label: 'Конные заводы', href: '/dashboard' },
+                { label: 'Тренеры', href: '/dashboard' },
+                { label: 'Жокеи', href: '/dashboard' },
+                { label: 'Ветеринарные врачи', href: '/dashboard' },
+                { label: 'Администраторы', href: '/dashboard' },
+              ].map(link => (
+                <li key={link.href + link.label}>
+                  <Link to={link.href} style={{ color: '#B8AFA6', fontFamily: "'Unbounded', sans-serif", fontSize: '0.875rem', textDecoration: 'none' }}
                     className="hover:opacity-70 transition-opacity">
-                    {role}
-                  </span>
+                    {link.label}
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -96,15 +103,15 @@ export function Footer() {
               </li>
               <li className="flex items-center gap-3">
                 <Phone size={16} style={{ color: C.accentGold, flexShrink: 0 }} />
-                <span style={{ color: '#B8AFA6', fontFamily: "'Unbounded', sans-serif", fontSize: '0.875rem' }}>
+                <a href="tel:+74959454517" style={{ color: '#B8AFA6', fontFamily: "'Unbounded', sans-serif", fontSize: '0.875rem', textDecoration: 'none' }} className="hover:opacity-70 transition-opacity">
                   +7 (495) 945-45-17
-                </span>
+                </a>
               </li>
               <li className="flex items-center gap-3">
                 <Mail size={16} style={{ color: C.accentGold, flexShrink: 0 }} />
-                <span style={{ color: '#B8AFA6', fontFamily: "'Unbounded', sans-serif", fontSize: '0.875rem' }}>
+                <a href="mailto:info@equitrack.ru" style={{ color: '#B8AFA6', fontFamily: "'Unbounded', sans-serif", fontSize: '0.875rem', textDecoration: 'none' }} className="hover:opacity-70 transition-opacity">
                   info@equitrack.ru
-                </span>
+                </a>
               </li>
             </ul>
           </div>
@@ -116,11 +123,14 @@ export function Footer() {
             © 2026 EquiTrack. Все права защищены.
           </p>
           <div className="flex items-center gap-4">
-            {['Политика конфиденциальности', 'Условия использования'].map(item => (
-              <span key={item} style={{ color: C.textMuted, fontFamily: "'Unbounded', sans-serif", fontSize: '0.8rem', cursor: 'pointer' }}
+            {[
+              { label: 'Политика конфиденциальности', href: '/privacy' },
+              { label: 'Условия использования', href: '/terms' },
+            ].map(item => (
+              <Link key={item.href} to={item.href} style={{ color: C.textMuted, fontFamily: "'Unbounded', sans-serif", fontSize: '0.8rem', textDecoration: 'none' }}
                 className="hover:opacity-70 transition-opacity">
-                {item}
-              </span>
+                {item.label}
+              </Link>
             ))}
           </div>
         </div>

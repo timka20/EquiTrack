@@ -74,11 +74,9 @@ export class RaceService {
       let resultsRows: any[] = [];
       try {
         resultsRows = db.prepare(`
-          SELECT rr.*, h.name as horse_name, h.color as horse_color,
-            u.first_name as jockey_first_name, u.last_name as jockey_last_name
+          SELECT rr.*, h.name as horse_name, h.color as horse_color
           FROM race_results rr
           JOIN horses h ON rr.horse_id = h.id
-          LEFT JOIN users u ON rr.jockey_id = u.id
           WHERE rr.race_id = ?
           ORDER BY rr.position ASC
         `).all(id) || [];
@@ -170,14 +168,15 @@ export class RaceService {
     return result.changes > 0;
   }
 
-  addResults(raceId: number, results: { horseId: number; position: number; time?: string; prize?: number; notes?: string }[]): boolean {
+  addResults(raceId: number, results: { horseId: number; position: number; time?: string; prize?: number; notes?: string; jockeyId?: number; trainerId?: number }[]): boolean {
+    const deleteExisting = db.prepare('DELETE FROM race_results WHERE race_id = ?');
     const insertResult = db.prepare(
-      'INSERT INTO race_results (race_id, horse_id, position, race_time, prize, notes) VALUES (?, ?, ?, ?, ?, ?)'
+      'INSERT INTO race_results (race_id, horse_id, position, race_time, prize, notes, jockey_id, trainer_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
     );
-
     const updateRace = db.prepare('UPDATE races SET status = ? WHERE id = ?');
 
     const transaction = db.transaction(() => {
+      deleteExisting.run(raceId);
       for (const result of results) {
         insertResult.run(
           raceId, 
@@ -185,7 +184,9 @@ export class RaceService {
           result.position, 
           result.time || null, 
           result.prize || 0, 
-          result.notes || null
+          result.notes || null,
+          result.jockeyId || null,
+          result.trainerId || null
         );
       }
       updateRace.run(RaceStatus.FINISHED, raceId);

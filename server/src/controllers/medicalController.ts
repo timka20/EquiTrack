@@ -43,10 +43,6 @@ export class MedicalController {
         return reply.status(400).send({ error: 'Укажите дату и описание' });
       }
 
-      if (!isFutureDate(date)) {
-        return reply.status(400).send({ error: 'Дата не может быть в прошлом' });
-      }
-
       if (!request.user) {
         return reply.status(401).send({ error: 'Не авторизован' });
       }
@@ -139,10 +135,6 @@ export class MedicalController {
 
       if (!name || !date) {
         return reply.status(400).send({ error: 'Укажите название и дату прививки' });
-      }
-
-      if (!isFutureDate(date)) {
-        return reply.status(400).send({ error: 'Дата прививки не может быть в прошлом' });
       }
 
       if (nextDate && !isDateAfter(nextDate, date)) {

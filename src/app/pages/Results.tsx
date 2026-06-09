@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Trophy, Calendar, MapPin, Clock, ChevronDown, Medal, TrendingUp, Award } from 'lucide-react';
 import { C } from '../data/colors';
-import { racesApi } from '../services/api';
+import { racesApi, adminApi } from '../services/api'; // Добавил adminApi для получения юзеров
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -43,8 +43,18 @@ export default function Results() {
     const fetchResults = async () => {
       try {
         setLoading(true);
-        const races = await racesApi.getAll();
+        
+        // 1. Загружаем всех пользователей сразу, чтобы иметь справочник имен
+        const users = await adminApi.getAllUsers().catch(() => []);
+        
+        // Создаем карту для быстрого поиска по ID: { 10: "Иван Иванов", ... }
+        const userMap = new Map<number, string>();
+        users.forEach((u: any) => {
+          const name = `${u.firstName || ''} ${u.lastName || ''}`.trim();
+          if (name) userMap.set(u.id, name);
+        });
 
+        const races = await racesApi.getAll();
         const finishedRaces = races.filter((r: any) => r.status === 'finished');
 
         const racesWithResults = await Promise.all(
@@ -62,10 +72,10 @@ export default function Results() {
                 results: (raceDetails.results || []).map((r: any) => ({
                   place: r.position,
                   horseName: r.horse_name || r.horseName,
-                  jockey: r.jockey_first_name && r.jockey_last_name 
-                    ? `${r.jockey_first_name} ${r.jockey_last_name}`
-                    : r.jockeyName || '—',
-                  trainer: r.trainer_name || '—',
+                  // 2. Ищем имя жокея по ID из карты
+                  jockey: r.jockey_id ? (userMap.get(r.jockey_id) || '—') : '—',
+                  // 3. Ищем имя тренера по ID из карты
+                  trainer: r.trainer_id ? (userMap.get(r.trainer_id) || '—') : '—',
                   raceTime: r.race_time,
                   earnings: r.prize || r.earnings || 0,
                 })),

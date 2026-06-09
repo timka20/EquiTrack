@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { C } from '../data/colors';
 import { useAuth } from '../contexts/AuthContext';
-import { horsesApi, racesApi, trainingsApi, medicalApi, adminApi, notificationsApi, breedingsApi, jockeyReportsApi } from '../services/api';
+import { horsesApi, racesApi, trainingsApi, medicalApi, adminApi, notificationsApi, breedingsApi, jockeyReportsApi, uploadApi } from '../services/api';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 
 type Role = 'owner' | 'farm' | 'trainer' | 'jockey' | 'vet' | 'admin' | 'user' | 'guest';
@@ -1208,6 +1208,11 @@ function AdminDashboard() {
   const [newRaceStatus, setNewRaceStatus] = useState('scheduled');
   const [creatingRaceLoading, setCreatingRaceLoading] = useState(false);
 
+  const [resultsRace, setResultsRace] = useState<any>(null);
+  const [resultsForm, setResultsForm] = useState<Array<{ horseId: string; position: string; time: string; prize: string; jockeyId: string; trainerId: string }>>([{ horseId: '', position: '', time: '', prize: '', jockeyId: '', trainerId: '' }]);
+  const [savingResults, setSavingResults] = useState(false);
+  const [expandedRaceId, setExpandedRaceId] = useState<number | null>(null);
+
   const roleLabels: Record<string, string> = {
     admin: 'Администратор',
     owner_private: 'Владелец',
@@ -1232,6 +1237,7 @@ function AdminDashboard() {
       fetchHorses();
     } else if (activeTab === 'events') {
       fetchRaces();
+      fetchUsers();
     } else if (activeTab === 'breeding') {
       fetchBreedings();
     } else if (activeTab === 'overview') {
@@ -1285,7 +1291,7 @@ function AdminDashboard() {
   const fetchRaces = async () => {
     try {
       const racesData = await racesApi.getAll();
-      setRaces(racesData.filter((r: any) => r.status !== 'finished'));
+      setRaces(racesData);
     } catch (err) {
       console.error('Error fetching races:', err);
     }
@@ -1382,7 +1388,7 @@ function AdminDashboard() {
     setEditRaceName(race.name || '');
     setEditRaceHippodrome(race.hippodrome || '');
     setEditRaceDistance(String(race.distance || ''));
-    setEditRacePrizeFund(String(race.prizeFund || ''));
+    setEditRacePrizeFund(String(race.prizeFund || race.prize_fund || ''));
     setEditRaceDate(race.date ? new Date(race.date).toISOString().split('T')[0] : '');
     setEditRaceStatus(race.status || 'upcoming');
   };
@@ -1441,6 +1447,10 @@ function AdminDashboard() {
   };
 
   const handleCreateRace = async () => {
+    if (!newRaceDate) {
+      alert('Укажите дату скачки');
+      return;
+    }
     setCreatingRaceLoading(true);
     try {
       const createData: any = {
@@ -1448,7 +1458,7 @@ function AdminDashboard() {
         hippodrome: newRaceHippodrome,
         distance: parseInt(newRaceDistance) || 0,
         prizeFund: parseInt(newRacePrizeFund) || 0,
-        date: newRaceDate ? new Date(newRaceDate).toISOString() : new Date().toISOString(),
+        date: new Date(newRaceDate).toISOString(),
         status: newRaceStatus,
       };
       const newRace = await racesApi.create(createData);
@@ -1459,6 +1469,62 @@ function AdminDashboard() {
       alert('Ошибка при создании: ' + err.message);
     } finally {
       setCreatingRaceLoading(false);
+    }
+  };
+
+  const openResultsModal = async (race: any) => {
+    setResultsRace(race);
+    try {
+      const raceDetails = await racesApi.getById(race.id);
+      if (raceDetails.results && raceDetails.results.length > 0) {
+        setResultsForm(raceDetails.results.map((res: any) => ({
+          horseId: String(res.horse_id || res.horseId),
+          position: String(res.position),
+          time: res.race_time || res.time || '',
+          prize: String(res.prize || 0),
+          jockeyId: String(res.jockey_id || res.jockeyId || ''),
+          trainerId: String(res.trainer_id || res.trainerId || ''),
+        })));
+      } else {
+        setResultsForm([{ horseId: '', position: '', time: '', prize: '', jockeyId: '', trainerId: '' }]);
+      }
+    } catch (err) {
+      setResultsForm([{ horseId: '', position: '', time: '', prize: '', jockeyId: '', trainerId: '' }]);
+    }
+  };
+
+  const closeResultsModal = () => {
+    console.log('CLOSING RESULTS MODAL');
+    setResultsRace(null);
+    setResultsForm([{ horseId: '', position: '', time: '', prize: '', jockeyId: '', trainerId: '' }]);
+  };
+
+  const handleSaveResults = async () => {
+    if (!resultsRace) return;
+    const validResults = resultsForm
+      .filter(r => r.horseId && r.position)
+      .map(r => ({
+        horseId: parseInt(r.horseId),
+        position: parseInt(r.position),
+        time: r.time || undefined,
+        prize: parseFloat(r.prize) || 0,
+        jockeyId: r.jockeyId ? parseInt(r.jockeyId) : undefined,
+        trainerId: r.trainerId ? parseInt(r.trainerId) : undefined,
+      }));
+    if (validResults.length === 0) {
+      alert('Добавьте хотя бы один результат');
+      return;
+    }
+    setSavingResults(true);
+    try {
+      await racesApi.addResults(resultsRace.id, validResults);
+      alert('Результаты сохранены');
+      closeResultsModal();
+      fetchRaces();
+    } catch (err: any) {
+      alert('Ошибка при сохранении результатов: ' + err.message);
+    } finally {
+      setSavingResults(false);
     }
   };
 
@@ -1883,7 +1949,7 @@ function AdminDashboard() {
         <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: '12px', padding: '1.5rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
             <h3 style={{ fontFamily: "'Unbounded', sans-serif", color: C.textPrimary, fontSize: '0.95rem', fontWeight: 700 }}>
-              Активные события ({races.length})
+              События ({races.length})
             </h3>
             <button
               onClick={openCreateRaceModal}
@@ -1898,22 +1964,216 @@ function AdminDashboard() {
           </div>
           <div className="space-y-3">
             {races.map(r => (
-              <div key={r.id} style={{ display: 'flex', gap: '1rem', alignItems: 'center', padding: '0.875rem 1rem', background: C.bgSecondary, borderRadius: '8px' }}>
-                <Calendar size={18} style={{ color: C.accentGold, flexShrink: 0 }} />
-                <div className="flex-1">
-                  <p style={{ color: C.textPrimary, fontWeight: 700, fontSize: '0.9rem' }}>{r.name}</p>
-                  <p style={{ color: C.textMuted, fontSize: '0.78rem' }}>{r.hippodrome} · {r.distance}м</p>
+              <div key={r.id} style={{ background: C.bgSecondary, borderRadius: '8px', overflow: 'hidden' }}>
+                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', padding: '0.875rem 1rem' }}>
+                  <Calendar size={18} style={{ color: C.accentGold, flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ color: C.textPrimary, fontWeight: 700, fontSize: '0.9rem' }}>{r.name}</p>
+                    <p style={{ color: C.textMuted, fontSize: '0.78rem' }}>{r.hippodrome} · {r.distance}м</p>
+                  </div>
+                  <div style={{ textAlign: 'right', flexShrink: 0, whiteSpace: 'nowrap' }}>
+                    <p style={{ fontFamily: "'Unbounded', sans-serif", color: C.accentGold, fontSize: '0.95rem', fontWeight: 700 }}>{formatMoney(r.prizeFund || r.prize_fund)}</p>
+                    <p style={{ color: C.textMuted, fontSize: '0.72rem' }}>{new Date(r.date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</p>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        openEditRaceModal(r);
+                      }}
+                      style={{ 
+                        background: 'none', 
+                        border: 'none', 
+                        color: C.accentGold, 
+                        cursor: 'pointer', 
+                        fontSize: '0.8rem', 
+                        fontWeight: 600,
+                        padding: '0.35rem 0.75rem',
+                        pointerEvents: 'auto',
+                        display: 'inline-block',
+                        whiteSpace: 'nowrap',
+                        flexShrink: 0
+                      }}
+                    >
+                      Редактировать
+                    </button>
+                    {r.status === 'finished' && (
+                      <button
+                        type="button"
+                        onClick={async (e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          const isOpening = expandedRaceId !== r.id;
+                          setExpandedRaceId(expandedRaceId === r.id ? null : r.id);
+                          if (isOpening) {
+                            try {
+                              const raceDetails = await racesApi.getById(r.id);
+                              if (raceDetails.results && raceDetails.results.length > 0) {
+                                setResultsForm(raceDetails.results.map((res: any) => ({
+                                  horseId: String(res.horse_id || res.horseId),
+                                  position: String(res.position),
+                                  time: res.race_time || res.time || '',
+                                  prize: String(res.prize || 0),
+                                  jockeyId: String(res.jockey_id || res.jockeyId || ''),
+                                  trainerId: String(res.trainer_id || res.trainerId || ''),
+                                })));
+                              } else {
+                                setResultsForm([{ horseId: '', position: '', time: '', prize: '', jockeyId: '', trainerId: '' }]);
+                              }
+                            } catch (err) {
+                              setResultsForm([{ horseId: '', position: '', time: '', prize: '', jockeyId: '', trainerId: '' }]);
+                            }
+                          }
+                        }}
+                        style={{ 
+                          background: 'none', 
+                          border: 'none', 
+                          color: '#16a34a', 
+                          cursor: 'pointer', 
+                          fontSize: '0.8rem', 
+                          fontWeight: 600,
+                          padding: '0.35rem 0.75rem',
+                          pointerEvents: 'auto',
+                          display: 'inline-block',
+                          whiteSpace: 'nowrap',
+                          flexShrink: 0
+                        }}
+                      >
+                        {expandedRaceId === r.id ? 'Скрыть' : 'Результаты'}
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div style={{ textAlign: 'right' }}>
-                  <p style={{ fontFamily: "'Unbounded', sans-serif", color: C.accentGold, fontSize: '0.95rem', fontWeight: 700 }}>{formatMoney(r.prizeFund || r.prize_fund)}</p>
-                  <p style={{ color: C.textMuted, fontSize: '0.72rem' }}>{new Date(r.date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</p>
-                </div>
-                <button
-                  onClick={() => openEditRaceModal(r)}
-                  style={{ background: 'none', border: 'none', color: C.accentGold, cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}
-                >
-                  Редактировать
-                </button>
+
+                {expandedRaceId === r.id && r.status === 'finished' && (
+                  <div style={{ borderTop: `1px solid ${C.border}`, padding: '1rem', background: C.white }}>
+                    <h4 style={{ color: C.textPrimary, fontWeight: 700, fontSize: '0.9rem', marginBottom: '1rem' }}>
+                      Добавить результаты: {r.name}
+                    </h4>
+                    <div className="space-y-3" style={{ marginBottom: '1rem' }}>
+                      {resultsForm.map((row, idx) => (
+                        <div key={idx} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 2fr 2fr', gap: '0.5rem', alignItems: 'end' }}>
+                          <div>
+                            <label style={{ color: C.textSecondary, fontSize: '0.75rem', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>Лошадь</label>
+                            <select value={row.horseId} onChange={e => {
+                              const next = [...resultsForm];
+                              next[idx].horseId = e.target.value;
+                              setResultsForm(next);
+                            }} style={{ width: '100%', background: C.bgSecondary, border: `1px solid ${C.border}`, borderRadius: '6px', padding: '0.5rem', fontSize: '0.82rem', color: C.textPrimary }}>
+                              <option value="">Выберите</option>
+                              {horses.map((h: any) => (
+                                <option key={h.id} value={h.id}>{h.name}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label style={{ color: C.textSecondary, fontSize: '0.75rem', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>Место</label>
+                            <input type="number" value={row.position} onChange={e => {
+                              const next = [...resultsForm];
+                              next[idx].position = e.target.value;
+                              setResultsForm(next);
+                            }} style={{ width: '100%', background: C.bgSecondary, border: `1px solid ${C.border}`, borderRadius: '6px', padding: '0.5rem', fontSize: '0.82rem', color: C.textPrimary }} />
+                          </div>
+                          <div>
+                            <label style={{ color: C.textSecondary, fontSize: '0.75rem', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>Время</label>
+                            <input placeholder="HH:MM:SS" value={row.time} onKeyDown={e => {
+                              const isDigit = /\d/.test(e.key);
+                              const isControl = ['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key);
+                              const isCtrlA = e.ctrlKey && e.key === 'a';
+                              if (!isDigit && !isControl && !isCtrlA) e.preventDefault();
+                            }} onChange={e => {
+                              let input = e.target.value.replace(/\D/g, '').slice(0, 6);
+                              let formatted = '';
+                              if (input.length > 0) formatted = input.slice(0, 2);
+                              if (input.length > 2) formatted += ':' + input.slice(2, 4);
+                              if (input.length > 4) formatted += ':' + input.slice(4, 6);
+                              const next = [...resultsForm];
+                              next[idx].time = formatted;
+                              setResultsForm(next);
+                            }} style={{ width: '100%', background: C.bgSecondary, border: `1px solid ${C.border}`, borderRadius: '6px', padding: '0.5rem', fontSize: '0.82rem', color: C.textPrimary }} />
+                          </div>
+                          <div>
+                            <label style={{ color: C.textSecondary, fontSize: '0.75rem', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>Приз</label>
+                            <input type="number" value={row.prize} onChange={e => {
+                              const next = [...resultsForm];
+                              next[idx].prize = e.target.value;
+                              setResultsForm(next);
+                            }} style={{ width: '100%', background: C.bgSecondary, border: `1px solid ${C.border}`, borderRadius: '6px', padding: '0.5rem', fontSize: '0.82rem', color: C.textPrimary }} />
+                          </div>
+                          <div>
+                            <label style={{ color: C.textSecondary, fontSize: '0.75rem', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>Жокей</label>
+                            <select value={row.jockeyId} onChange={e => {
+                              const next = [...resultsForm];
+                              next[idx].jockeyId = e.target.value;
+                              setResultsForm(next);
+                            }} style={{ width: '100%', background: C.bgSecondary, border: `1px solid ${C.border}`, borderRadius: '6px', padding: '0.5rem', fontSize: '0.82rem', color: C.textPrimary }}>
+                              <option value="">Не указан</option>
+                              {users.filter((u: any) => u.role === 'jockey').map((u: any) => (
+                                <option key={u.id} value={u.id}>{u.firstName || ''} {u.lastName || ''}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label style={{ color: C.textSecondary, fontSize: '0.75rem', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>Тренер</label>
+                            <select value={row.trainerId} onChange={e => {
+                              const next = [...resultsForm];
+                              next[idx].trainerId = e.target.value;
+                              setResultsForm(next);
+                            }} style={{ width: '100%', background: C.bgSecondary, border: `1px solid ${C.border}`, borderRadius: '6px', padding: '0.5rem', fontSize: '0.82rem', color: C.textPrimary }}>
+                              <option value="">Не указан</option>
+                              {users.filter((u: any) => u.role === 'trainer').map((u: any) => (
+                                <option key={u.id} value={u.id}>{u.firstName || ''} {u.lastName || ''}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      ))}
+                      <button onClick={() => setResultsForm([...resultsForm, { horseId: '', position: '', time: '', prize: '', jockeyId: '', trainerId: '' }])} style={{ background: 'none', border: `1px solid ${C.border}`, color: C.textSecondary, borderRadius: '6px', padding: '0.5rem', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer', width: '100%' }}>
+                        + Добавить строку
+                      </button>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.75rem' }}>
+                      <button onClick={async () => {
+                        const validResults = resultsForm
+                          .filter(row => row.horseId && row.position)
+                          .map(row => ({
+                            horseId: parseInt(row.horseId),
+                            position: parseInt(row.position),
+                            time: row.time || undefined,
+                            prize: parseFloat(row.prize) || 0,
+                            jockeyId: row.jockeyId ? parseInt(row.jockeyId) : undefined,
+                            trainerId: row.trainerId ? parseInt(row.trainerId) : undefined,
+                          }));
+                        if (validResults.length === 0) {
+                          alert('Добавьте хотя бы один результат');
+                          return;
+                        }
+                        setSavingResults(true);
+                        try {
+                          await racesApi.addResults(r.id, validResults);
+                          alert('Результаты сохранены');
+                          setExpandedRaceId(null);
+                          setResultsForm([{ horseId: '', position: '', time: '', prize: '', jockeyId: '', trainerId: '' }]);
+                          fetchRaces();
+                        } catch (err: any) {
+                          alert('Ошибка при сохранении результатов: ' + err.message);
+                        } finally {
+                          setSavingResults(false);
+                        }
+                      }} disabled={savingResults} style={{ flex: 1, background: C.accentGold, color: C.textPrimary, border: 'none', borderRadius: '6px', padding: '0.6rem', fontSize: '0.875rem', fontWeight: 700, cursor: 'pointer' }}>
+                        {savingResults ? 'Сохранение...' : 'Сохранить результаты'}
+                      </button>
+                      <button onClick={() => {
+                        setExpandedRaceId(null);
+                        setResultsForm([{ horseId: '', position: '', time: '', prize: '', jockeyId: '', trainerId: '' }]);
+                      }} style={{ flex: 1, background: C.bgSecondary, color: C.textSecondary, border: `1px solid ${C.border}`, borderRadius: '6px', padding: '0.6rem', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer' }}>
+                        Отмена
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
             {races.length === 0 && (
@@ -1929,9 +2189,9 @@ function AdminDashboard() {
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
           background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          zIndex: 1000, padding: '1rem'
-        }}>
-          <div style={{ background: C.white, borderRadius: '12px', padding: '1.5rem', width: '100%', maxWidth: '450px', maxHeight: '90vh', overflow: 'auto' }}>
+          zIndex: 9999, padding: '1rem'
+        }} onClick={() => setEditingRace(null)}>
+          <div style={{ background: C.white, borderRadius: '12px', padding: '1.5rem', width: '100%', maxWidth: '450px', maxHeight: '90vh', overflow: 'auto', boxShadow: '0 10px 40px rgba(0,0,0,0.2)' }} onClick={e => e.stopPropagation()}>
             <h3 style={{ fontFamily: "'Unbounded', sans-serif", color: C.textPrimary, fontSize: '1rem', fontWeight: 700, marginBottom: '1.25rem' }}>
               Редактировать событие
             </h3>
@@ -2202,6 +2462,7 @@ function FarmDashboard() {
   const [allHorses, setAllHorses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [horsePhotoFile, setHorsePhotoFile] = useState<File | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -2231,6 +2492,11 @@ function FarmDashboard() {
       return;
     }
     try {
+      let photoUrl = 'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?w=800';
+      if (horsePhotoFile) {
+        const uploadRes = await uploadApi.uploadImage(horsePhotoFile);
+        photoUrl = uploadRes.url;
+      }
       await horsesApi.create({
         name: formData.get('name') as string,
         gender: formData.get('gender') as string,
@@ -2240,8 +2506,9 @@ function FarmDashboard() {
         fatherId: formData.get('fatherId') ? parseInt(formData.get('fatherId') as string) : undefined,
         motherId: formData.get('motherId') ? parseInt(formData.get('motherId') as string) : undefined,
         status: formData.get('status') as string || 'in_training',
-        photos: ['https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?w=800'],
+        photos: [photoUrl],
       });
+      setHorsePhotoFile(null);
       setShowAddModal(false);
       const data = await horsesApi.getAll({ ownerId: user?.id });
       setHorses(data);
@@ -2333,6 +2600,106 @@ function FarmDashboard() {
         </div>
       </div>
 
+      {resultsRace && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1rem' }} onClick={() => closeResultsModal()}>
+          <div style={{ background: C.white, borderRadius: '12px', padding: '1.5rem', width: '100%', maxWidth: '600px', maxHeight: '90vh', overflow: 'auto', boxShadow: '0 10px 40px rgba(0,0,0,0.3)' }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ fontFamily: "'Unbounded', sans-serif", color: C.textPrimary, fontSize: '1rem', fontWeight: 700, marginBottom: '1.25rem' }}>
+              Результаты: {resultsRace.name}
+            </h3>
+            <div className="space-y-3">
+              {resultsForm.map((row, idx) => (
+                <div key={idx} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 2fr 2fr', gap: '0.5rem', alignItems: 'end' }}>
+                  <div>
+                    <label style={{ color: C.textSecondary, fontSize: '0.75rem', fontWeight: 600 }}>Лошадь</label>
+                    <select value={row.horseId} onChange={e => {
+                      const next = [...resultsForm];
+                      next[idx].horseId = e.target.value;
+                      setResultsForm(next);
+                    }} style={{ width: '100%', background: C.bgSecondary, border: `1px solid ${C.border}`, borderRadius: '6px', padding: '0.5rem', fontSize: '0.82rem', color: C.textPrimary }}>
+                      <option value="">Выберите</option>
+                      {horses.map((h: any) => (
+                        <option key={h.id} value={h.id}>{h.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ color: C.textSecondary, fontSize: '0.75rem', fontWeight: 600 }}>Место</label>
+                    <input type="number" value={row.position} onChange={e => {
+                      const next = [...resultsForm];
+                      next[idx].position = e.target.value;
+                      setResultsForm(next);
+                    }} style={{ width: '100%', background: C.bgSecondary, border: `1px solid ${C.border}`, borderRadius: '6px', padding: '0.5rem', fontSize: '0.82rem', color: C.textPrimary }} />
+                  </div>
+                  <div>
+                    <label style={{ color: C.textSecondary, fontSize: '0.75rem', fontWeight: 600 }}>Время</label>
+                    <input placeholder="HH:MM:SS" value={row.time} onKeyDown={e => {
+                      const isDigit = /\d/.test(e.key);
+                      const isControl = ['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key);
+                      const isCtrlA = e.ctrlKey && e.key === 'a';
+                      if (!isDigit && !isControl && !isCtrlA) e.preventDefault();
+                    }} onChange={e => {
+                      let input = e.target.value.replace(/\D/g, '').slice(0, 6);
+                      let formatted = '';
+                      if (input.length > 0) formatted = input.slice(0, 2);
+                      if (input.length > 2) formatted += ':' + input.slice(2, 4);
+                      if (input.length > 4) formatted += ':' + input.slice(4, 6);
+                      const next = [...resultsForm];
+                      next[idx].time = formatted;
+                      setResultsForm(next);
+                    }} style={{ width: '100%', background: C.bgSecondary, border: `1px solid ${C.border}`, borderRadius: '6px', padding: '0.5rem', fontSize: '0.82rem', color: C.textPrimary }} />
+                  </div>
+                  <div>
+                    <label style={{ color: C.textSecondary, fontSize: '0.75rem', fontWeight: 600 }}>Приз</label>
+                    <input type="number" value={row.prize} onChange={e => {
+                      const next = [...resultsForm];
+                      next[idx].prize = e.target.value;
+                      setResultsForm(next);
+                    }} style={{ width: '100%', background: C.bgSecondary, border: `1px solid ${C.border}`, borderRadius: '6px', padding: '0.5rem', fontSize: '0.82rem', color: C.textPrimary }} />
+                  </div>
+                  <div>
+                    <label style={{ color: C.textSecondary, fontSize: '0.75rem', fontWeight: 600 }}>Жокей</label>
+                    <select value={row.jockeyId} onChange={e => {
+                      const next = [...resultsForm];
+                      next[idx].jockeyId = e.target.value;
+                      setResultsForm(next);
+                    }} style={{ width: '100%', background: C.bgSecondary, border: `1px solid ${C.border}`, borderRadius: '6px', padding: '0.5rem', fontSize: '0.82rem', color: C.textPrimary }}>
+                      <option value="">Не указан</option>
+                      {users.filter((u: any) => u.role === 'jockey').map((u: any) => (
+                        <option key={u.id} value={u.id}>{u.firstName || ''} {u.lastName || ''}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ color: C.textSecondary, fontSize: '0.75rem', fontWeight: 600 }}>Тренер</label>
+                    <select value={row.trainerId} onChange={e => {
+                      const next = [...resultsForm];
+                      next[idx].trainerId = e.target.value;
+                      setResultsForm(next);
+                    }} style={{ width: '100%', background: C.bgSecondary, border: `1px solid ${C.border}`, borderRadius: '6px', padding: '0.5rem', fontSize: '0.82rem', color: C.textPrimary }}>
+                      <option value="">Не указан</option>
+                      {users.filter((u: any) => u.role === 'trainer').map((u: any) => (
+                        <option key={u.id} value={u.id}>{u.firstName || ''} {u.lastName || ''}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              ))}
+              <button onClick={() => setResultsForm([...resultsForm, { horseId: '', position: '', time: '', prize: '', jockeyId: '', trainerId: '' }])} style={{ background: 'none', border: `1px solid ${C.border}`, color: C.textSecondary, borderRadius: '6px', padding: '0.5rem', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer', width: '100%' }}>
+                + Добавить строку
+              </button>
+            </div>
+            <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem' }}>
+              <button onClick={handleSaveResults} disabled={savingResults} style={{ flex: 1, background: C.accentGold, color: C.textPrimary, border: 'none', borderRadius: '8px', padding: '0.75rem', fontSize: '0.875rem', fontWeight: 700, cursor: 'pointer' }}>
+                {savingResults ? 'Сохранение...' : 'Сохранить результаты'}
+              </button>
+              <button onClick={closeResultsModal} style={{ flex: 1, background: C.bgSecondary, color: C.textSecondary, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '0.75rem', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer' }}>
+                Отмена
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showAddModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
           <div style={{ background: C.white, borderRadius: '12px', padding: '1.5rem', width: '100%', maxWidth: '500px', maxHeight: '90vh', overflow: 'auto' }}>
@@ -2394,6 +2761,11 @@ function FarmDashboard() {
                   <option value="breeding">В разведении</option>
                   <option value="resting">На отдыхе</option>
                 </select>
+              </div>
+              <div>
+                <label style={{ color: C.textSecondary, fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>Фотография</label>
+                <input type="file" accept="image/*" onChange={e => setHorsePhotoFile(e.target.files?.[0] || null)} style={{ width: '100%', background: C.bgSecondary, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '0.6rem', fontSize: '0.82rem', color: C.textPrimary }} />
+                {horsePhotoFile && <p style={{ color: C.textMuted, fontSize: '0.75rem', marginTop: '0.25rem' }}>{horsePhotoFile.name}</p>}
               </div>
               <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem' }}>
                 <button type="submit" style={{ flex: 1, background: C.accentGold, color: C.textPrimary, border: 'none', borderRadius: '8px', padding: '0.75rem', fontSize: '0.875rem', fontWeight: 700, cursor: 'pointer' }}>Добавить</button>

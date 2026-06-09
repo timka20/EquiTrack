@@ -29,6 +29,9 @@ export class HorseController {
           description: h.description,
           status: h.status,
           price: h.price,
+          starts: (h as any).starts,
+          wins: (h as any).wins,
+          places: (h as any).places,
           ownerName: h.ownerName,
           stats: (h as any).stats
         })) as any;
@@ -63,9 +66,14 @@ export class HorseController {
           photos: horse.photos,
           description: horse.description,
           price: horse.price,
+          status: horse.status,
           pedigree: horse.pedigree,
           stats: horse.stats,
-          raceHistory: horse.raceHistory
+          raceHistory: horse.raceHistory,
+          owner: horse.owner,
+          ownerName: horse.ownerName,
+          ownerPhone: horse.owner?.phone || null,
+          ownerId: horse.owner_id,
         });
       }
 
